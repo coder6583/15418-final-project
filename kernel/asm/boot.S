@@ -196,6 +196,7 @@ _svc_asm_handler_:
   mrseq r1, msp
   mrsne r1, psp
 @ determine if we are in msp or psp
+  mov r5, r1
 
   ldr r0, [r1, #24]
 
@@ -206,7 +207,7 @@ _svc_asm_handler_:
   subs r0, r0, #2
   bl svc_c_handler
 
-  str r0, [r1, #0]
+  str r0, [r5, #0]
 
 @ restore it  
   mov lr, r4
