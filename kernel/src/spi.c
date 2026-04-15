@@ -80,7 +80,7 @@ void sys_spi_init(uint8_t link_id) {
     // initialize SPI2_MISO line
     gpio_init(GPIO_B, 14, MODE_ALT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT5);
     // initialize SPI2_MISO line
-    gpio_init(GPIO_B, 12, MODE_ALT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT5);
+    gpio_init(GPIO_B, 12, MODE_ALT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_PULL_UP, ALT5);
 
     // Set the data frame format
     spi -> CR1 |= SPI_DFF_8BIT;
@@ -99,16 +99,22 @@ void sys_spi_init(uint8_t link_id) {
     spi -> CR2 |= SPI_FRF;
 
     // Select unidirectional mode
-    spi -> CR1 |= SPI_BIDIMODE_UNI;
+    // spi -> CR1 |= SPI_BIDIMODE_UNI;
 
     // Select read only
-    spi -> CR1 |= SPI_RXONLY;
+    // spi -> CR1 |= SPI_RXONLY;
 
     // Set slave mode
     spi -> CR1 |= SPI_SLAVE;
 
     // Enable SPI
     spi -> CR1 |= SPI_EN;
+
+    while (spi -> SR & SPI_SR_RXNE) {
+      volatile uint8_t dummy;
+      dummy = *((volatile uint8_t *)&spi -> DR);
+      (void)dummy;
+    }
   } else {
     // OUTPUT: SPI3, should be master
     struct spi_reg_map *spi = SPI3_BASE;
@@ -143,10 +149,10 @@ void sys_spi_init(uint8_t link_id) {
     spi -> CR2 |= SPI_FRF;
 
     // Select unidirectional mode
-    spi -> CR1 |= SPI_BIDIMODE_UNI;
+    // spi -> CR1 |= SPI_BIDIMODE_UNI;
 
     // Select transmit only
-    spi -> CR1 |= SPI_TXONLY;
+    // spi -> CR1 |= SPI_TXONLY;
 
     // Set master mode
     spi -> CR1 |= SPI_MASTER;
