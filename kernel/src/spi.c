@@ -48,6 +48,10 @@ struct spi_reg_map {
 #define SPI_SSM (1 << 9) // CR1
 #define SPI_SSI (1 << 8) // CR1
 
+#define SPI_RXONLY (1 << 10) // CR1
+#define SPI_TXONLY (0 << 10) // CR1
+#define SPI_BIDIMODE_UNI (1 << 15) // CR1
+
 #define SPI_FRF (0 << 4) // CR2
 
 #define SPI_EN (1 << 6) // CR1
@@ -56,6 +60,10 @@ struct spi_reg_map {
 #define RCC_SPI2_CLOCK_EN (1 << 14) // APB1_ENR
 #define RCC_SPI3_CLOCK_EN (1 << 15) // APB1_ENR
 #define RCC_SPI4_CLOCK_EN (1 << 13) // APB2_ENR
+
+#define SPI_SR_TXE (1 << 1)
+#define SPI_SR_RXNE (0 << 1)
+#define SPI_SR_BSY (1 << 7)
 
 void sys_spi_init(uint8_t link_id) {
   struct rcc_reg_map *rcc = RCC_BASE;
@@ -71,6 +79,8 @@ void sys_spi_init(uint8_t link_id) {
     gpio_init(GPIO_B, 15, MODE_ALT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT5);
     // initialize SPI2_MISO line
     gpio_init(GPIO_B, 14, MODE_ALT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT5);
+    // initialize SPI2_MISO line
+    gpio_init(GPIO_B, 12, MODE_ALT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT5);
 
     // Set the data frame format
     spi -> CR1 |= SPI_DFF_8BIT;
@@ -82,12 +92,17 @@ void sys_spi_init(uint8_t link_id) {
     // Set MSB first
     spi -> CR1 |= SPI_MSBFIRST;
 
-    // Set software chip select, always HIGH
-    spi -> CR1 |= SPI_SSM;
-    spi -> CR1 |= SPI_SSI;
+    // Deassert software slave management, always read NSS
+    spi -> CR1 &= ~SPI_SSM;
 
     // Select motorola mode
     spi -> CR2 |= SPI_FRF;
+
+    // Select unidirectional mode
+    spi -> CR1 |= SPI_BIDIMODE_UNI;
+
+    // Select read only
+    spi -> CR1 |= SPI_RXONLY;
 
     // Set slave mode
     spi -> CR1 |= SPI_SLAVE;
@@ -105,6 +120,10 @@ void sys_spi_init(uint8_t link_id) {
     gpio_init(GPIO_B, 5, MODE_ALT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT6);
     // initialize SPI3_MISO line
     gpio_init(GPIO_B, 4, MODE_ALT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT6);
+    // initialize SPI3_NSS line, just normal GPIO
+    gpio_init(GPIO_A, 10, MODE_GP_OUTPUT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT0);
+    // deassert NSS
+    gpio_set(GPIO_A, 10);
 
     // Set the data frame format
     spi -> CR1 |= SPI_DFF_8BIT;
@@ -123,10 +142,53 @@ void sys_spi_init(uint8_t link_id) {
     // Select motorola mode
     spi -> CR2 |= SPI_FRF;
 
+    // Select unidirectional mode
+    spi -> CR1 |= SPI_BIDIMODE_UNI;
+
+    // Select transmit only
+    spi -> CR1 |= SPI_TXONLY;
+
     // Set master mode
     spi -> CR1 |= SPI_MASTER;
 
     // Enable SPI
     spi -> CR1 |= SPI_EN;
   }
+}
+
+void sys_spi_transmit(uint8_t *tx_data, uint32_t len) {
+  struct spi_reg_map *spi = SPI3_BASE;
+
+  // Chip select
+  gpio_clr(GPIO_A, 10);
+
+  // Make sure there's nothing transmitting currently
+  while (!(spi -> SR & SPI_SR_TXE));
+
+  for (uint32_t i = 0; i < len; i++) {
+    // Set DR, immediately sends tx_data
+    *((volatile uint8_t *)&spi->DR) = tx_data[i];
+    
+    // Make sure there's nothing transmitting currently
+    while (!(spi -> SR & SPI_SR_TXE));
+  }
+
+  // Make sure the SPI module is not busy
+  while (spi -> SR & SPI_SR_BSY);
+
+  // Chip unselect
+  gpio_set(GPIO_A, 10);
+}
+
+void sys_spi_receive(uint8_t *rx_data, uint32_t len) {
+  struct spi_reg_map *spi = SPI2_BASE;
+
+  for (uint32_t i = 0; i < len; i++) {
+    // Wait until the receive buffer is not empty
+    while (!(spi -> SR & SPI_SR_RXNE));
+    
+    rx_data[i] = *((volatile uint8_t *)&spi->DR);
+  }
+  
+  return;
 }
