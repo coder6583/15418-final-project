@@ -35,7 +35,7 @@ struct spi_reg_map {
 #define SPI_BR_DIV256 (7 << 3) // CR1
 
 #define SPI_CPOL_LOW (0 << 1) // CR1
-#define SPI_CPOL_HIGH (0 << 1) // CR1
+#define SPI_CPOL_HIGH (1 << 1) // CR1
 #define SPI_CPHA_FIRST (0) // CR1
 #define SPI_CPHA_SECOND (1) // CR1
 
@@ -62,7 +62,7 @@ struct spi_reg_map {
 #define RCC_SPI4_CLOCK_EN (1 << 13) // APB2_ENR
 
 #define SPI_SR_TXE (1 << 1)
-#define SPI_SR_RXNE (0 << 1)
+#define SPI_SR_RXNE (1 << 0)
 #define SPI_SR_BSY (1 << 7)
 
 void sys_spi_init(uint8_t link_id) {
@@ -189,6 +189,6 @@ void sys_spi_receive(uint8_t *rx_data, uint32_t len) {
     
     rx_data[i] = *((volatile uint8_t *)&spi->DR);
   }
-  
+
   return;
 }
