@@ -14,6 +14,7 @@
 #include <lcd_driver.h>
 #include "systick.h"
 #include "spi.h"
+#include "printk.h"
 
 #define UART_USARTDIV_MANTISSA 8
 #define UART_USARTDIV_FRAC 11
@@ -124,12 +125,15 @@ int kernel_main(void) {
     sys_spi_init(LINK_IN);
     sys_spi_init(LINK_OUT);
 
-    char *s = "hello";
     char recv[6];
     recv[5] = '\0';
 
     sys_spi_receive((uint8_t*)recv, 5);
+    printk("received: %s", recv);
 
-    while (1);
+    while (1) {
+        sys_spi_receive((uint8_t*)recv, 5);
+        printk("received: %s", recv);
+    }
     return 0;
 }
