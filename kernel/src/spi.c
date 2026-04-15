@@ -79,7 +79,7 @@ void sys_spi_init(uint8_t link_id) {
     gpio_init(GPIO_B, 15, MODE_ALT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT5);
     // initialize SPI2_MISO line
     gpio_init(GPIO_B, 14, MODE_ALT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT5);
-    // initialize SPI2_MISO line
+    // initialize SPI2_NSS line
     gpio_init(GPIO_B, 12, MODE_ALT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_PULL_UP, ALT5);
 
     // Set the data frame format
@@ -189,12 +189,22 @@ void sys_spi_transmit(uint8_t *tx_data, uint32_t len) {
 void sys_spi_receive(uint8_t *rx_data, uint32_t len) {
   struct spi_reg_map *spi = SPI2_BASE;
 
+  while (gpio_read(GPIO_B, 12) == 1);
+
+  while (spi -> SR & SPI_SR_RXNE) {
+    volatile uint8_t dummy;
+    dummy = *((volatile uint8_t *)&spi -> DR);
+    (void)dummy;
+  }
+
   for (uint32_t i = 0; i < len; i++) {
     // Wait until the receive buffer is not empty
     while (!(spi -> SR & SPI_SR_RXNE));
     
     rx_data[i] = *((volatile uint8_t *)&spi->DR);
   }
+
+  while (gpio_read(GPIO_B, 12) == 0);
 
   return;
 }
