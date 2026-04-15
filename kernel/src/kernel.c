@@ -120,20 +120,16 @@ int kernel_main(void) {
 	//       OUTPUT_SPEED_HIGH, PUPD_PULL_UP, ALT0);
     // enable_exti(BUTTON2_PORT, BUTTON2_NUM, RISING_EDGE);
     
-    // enter_user_mode();
+    enter_user_mode();
 
-    sys_spi_init(LINK_IN);
-    sys_spi_init(LINK_OUT);
+    // sys_spi_init(LINK_IN);
+    // sys_spi_init(LINK_OUT);
 
-    char recv[6];
-    recv[5] = '\0';
-
-    sys_spi_receive((uint8_t*)recv, 5);
-    printk("received: %s", recv);
+    // char *s = "hello";
 
     while (1) {
-        sys_spi_receive((uint8_t*)recv, 5);
-        printk("received: %s", recv);
+    //     sys_spi_transmit((uint8_t*)s, 5);
+    //     for (int i = 0; i < 10000; i++);
     }
     return 0;
 }
