@@ -62,4 +62,8 @@
 #define SVC_LCD_PRINT 28
 #define SVC_LCD_INIT 29
 
+#define SVC_SPI_INIT 30
+#define SVC_SPI_TRANSMIT 31
+#define SVC_SPI_RECEIVE 32
+
 #endif /* _SVC_NUM_H_ */

@@ -147,3 +147,18 @@ lcd_print_str:
 lcd_init:
   svc #SVC_LCD_INIT
   bx lr
+
+.global spi_init
+spi_init:
+  svc #SVC_SPI_INIT
+  bx lr
+
+.global spi_transmit
+spi_transmit:
+  svc #SVC_SPI_TRANSMIT
+  bx lr
+
+.global spi_receive
+spi_receive:
+  svc #SVC_SPI_RECEIVE
+  bx lr

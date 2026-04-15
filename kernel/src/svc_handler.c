@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <lcd_driver.h>
+#include <spi.h>
 #define UNUSED __attribute__((unused))
 
 // case on svc calls and map them to corresponding syscalls
@@ -70,23 +71,32 @@ void svc_c_handler(uint32_t *svc_addr, uint32_t *stack_frame ) {
         sys_thread_kill();
         return;
     case SVC_SET_MOTOR:
-	sys_motor_set((enum motor_mapping) r0, (uint32_t)r1, (direction_t)r2);
-	return;
+	    sys_motor_set((enum motor_mapping) r0, (uint32_t)r1, (direction_t)r2);
+	    return;
     case SVC_REG_ENC_CALLBACK:
-	sys_register_encoder_callback((uint32_t)r0, (void*)r1);
-	return;
+	    sys_register_encoder_callback((uint32_t)r0, (void*)r1);
+	    return;
     case SVC_LCD_CLEAR:
-	lcd_clear();
-	return;
+	    lcd_clear();
+	    return;
     case SVC_LCD_SET_CURSOR:
-	lcd_set_cursor((uint8_t) r0, (uint8_t) r1);
-	return;
+	    lcd_set_cursor((uint8_t) r0, (uint8_t) r1);
+	    return;
     case SVC_LCD_PRINT:
-	lcd_print((char *)r0);
-	return;
+	    lcd_print((char *)r0);
+	    return;
     case SVC_LCD_INIT:
-	lcd_driver_init();
-	return;
+	    lcd_driver_init();
+	    return;
+    case SVC_SPI_INIT:
+        sys_spi_init((uint8_t) r0);
+        return;
+    case SVC_SPI_TRANSMIT:
+        sys_spi_transmit((void*)r0, (uint32_t)r1);
+        return;
+    case SVC_SPI_RECEIVE:
+        sys_spi_receive((void*)r0, (uint32_t)r1);
+        return;
     default:
         return;
     }
