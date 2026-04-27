@@ -4,6 +4,8 @@
 #include <string.h>
 #include <stdio.h>
 
+#define BULLSHIT for(int i = 0; i < 100000; i++);
+
 // hard-coded address
 static addr_t addr = 1;
 // initialize everything we need here
@@ -26,6 +28,7 @@ packet_t get_packet() {
   while (1) {
     printf("reciving next bytes\n");
     spi_receive(buf, _NETWORK_HEADER_SIZE);
+    BULLSHIT
     printf("done\n");
     p.__start = buf[0];
     p.src = buf[1];
@@ -33,10 +36,12 @@ packet_t get_packet() {
     p.ttl = buf[3];
     p.len = buf[4];
     p.opcode = buf[5];
-    print_packet(p);
     if (p.dest == addr) { 
+      print_packet(p);
       // packet is for us
       spi_receive(buf, p.len);
+      BULLSHIT
+      print_packet(p);
       memcpy(p.payload, buf, p.len);
       return p;
     } else {
@@ -64,8 +69,10 @@ void send_packet(addr_t dest, uint8_t *data, uint8_t len, opcode_t op) {
   buf[4] = len;
   buf[5] = op;
   spi_transmit(buf, _NETWORK_HEADER_SIZE);
+  BULLSHIT
   if (len > 0)
   spi_transmit(data, len);
+  BULLSHIT;
 }
 
 // print a packet in a clean way

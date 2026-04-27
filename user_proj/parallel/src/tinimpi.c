@@ -17,7 +17,7 @@ void tinimpi_send(rank_t dest, tag_t tag, uint8_t *buf, uint16_t len) {
   uint8_t header_data[] = { tag };
   // send SYN
   MPI_DEBUG("sending SYN to rank %d,tag=%d\n", dest, tag);
-  send_packet(dest, header_data, 1, SYN);
+  send_packet(dest, header_data, 8, SYN);
   packet_t p;
   // wait for ACK
   MPI_DEBUG("waiting for ACK from %d...\n", dest);
@@ -39,7 +39,6 @@ void tinimpi_recv(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, ui
   MPI_DEBUG("waiting for SYN from %d...\n", src);
   while (1) {
     p = get_packet();
-    print_packet(p);
     if (p.src == src && p.opcode == SYN) {
       MPI_DEBUG("recieved SYN from %d!\n", src);
       MPI_DEBUG("--> tag is [%d](%c)\n", tag, (char)(tag+'0'));

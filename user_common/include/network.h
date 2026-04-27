@@ -10,9 +10,9 @@
 typedef uint8_t addr_t;
 typedef uint8_t opcode_t;
 
-#define SYN 0;
-#define ACK 1;
-#define DATA 2;
+#define SYN 0
+#define ACK 1
+#define DATA 2
 
 
 // type definition for a packet
