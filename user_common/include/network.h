@@ -8,11 +8,12 @@
 #define _NETWORK_HEADER_SIZE 6
 #define _NETWORK_MAX_PACKET_SIZE _NETWORK_MAX_PAYLOAD_SIZE + 6
 typedef uint8_t addr_t;
-typedef enum {
-  SYN,
-  ACK,
-  DATA
-} opcode_t;
+typedef uint8_t opcode_t;
+
+#define SYN 0;
+#define ACK 1;
+#define DATA 2;
+
 
 // type definition for a packet
 // header: 7 bytes, payload: 64 bytes

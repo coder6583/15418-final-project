@@ -40,8 +40,9 @@ void tinimpi_recv(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, ui
   while (1) {
     p = get_packet();
     print_packet(p);
-    if (p.src == src && p.payload[0] == tag && p.opcode == SYN) {
+    if (p.src == src && p.opcode == SYN) {
       MPI_DEBUG("recieved SYN from %d!\n", src);
+      MPI_DEBUG("--> tag is [%d](%c)\n", tag, (char)(tag+'0'));
       break;
     }
   }
