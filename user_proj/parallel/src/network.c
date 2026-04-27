@@ -38,7 +38,6 @@ packet_t get_packet() {
     p.opcode = buf[5];
     if (p.dest == addr) { 
       // packet is for us
-      BULLSHIT
       memcpy(p.payload, buf+6, p.len);
       print_packet(p);
       return p;
@@ -66,7 +65,7 @@ void send_packet(addr_t dest, uint8_t *data, uint8_t len, opcode_t op) {
   buf[3] = _NETWORK_TTL_INIT;
   buf[4] = len;
   buf[5] = op;
-  memcpy(buf+_NETWORK_HEADER_SIZE, data, len);
+  if (data != NULL) memcpy(buf+_NETWORK_HEADER_SIZE, data, len);
   spi_transmit(buf, _NETWORK_MAX_PACKET_SIZE);
   BULLSHIT
 }
