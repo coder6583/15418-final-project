@@ -11,6 +11,7 @@ void net_init(addr_t a) {
   spi_init(LINK_IN);
   spi_init(LINK_OUT);
   addr = a;
+  printf("addr is %d\n", addr);
 }
 
 inline uint8_t packet_size(packet_t p) {
@@ -23,7 +24,9 @@ packet_t get_packet() {
   packet_t p;
   uint8_t buf[sizeof(packet_t)];
   while (1) {
+    printf("reciving next bytes\n");
     spi_receive(buf, _NETWORK_HEADER_SIZE);
+    printf("done\n");
     p.__start = buf[0];
     p.src = buf[1];
     p.dest = buf[2];
@@ -35,7 +38,6 @@ packet_t get_packet() {
       // packet is for us
       spi_receive(buf, p.len);
       memcpy(p.payload, buf, p.len);
-      print_packet(p);
       return p;
     } else {
       // packet is not for us, forward if possible;
@@ -61,9 +63,9 @@ void send_packet(addr_t dest, uint8_t *data, uint8_t len, opcode_t op) {
   buf[3] = _NETWORK_TTL_INIT;
   buf[4] = len;
   buf[5] = op;
-  if (len > 0)  memcpy(buf+6, data, len);
-
-  spi_transmit(buf, 6+len);
+  spi_transmit(buf, _NETWORK_HEADER_SIZE);
+  if (len > 0)
+  spi_transmit(data, len);
 }
 
 // print a packet in a clean way
