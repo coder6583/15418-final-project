@@ -17,7 +17,7 @@ void tinimpi_send(rank_t dest, tag_t tag, uint8_t *buf, uint16_t len) {
   uint8_t header_data[] = { tag };
   // send SYN
   MPI_DEBUG("sending SYN to rank %d,tag=%d\n", dest, tag);
-  send_packet(dest, header_data, len, SYN);
+  send_packet(dest, header_data, 1, SYN);
   packet_t p;
   // wait for ACK
   MPI_DEBUG("waiting for ACK from %d...\n", dest);

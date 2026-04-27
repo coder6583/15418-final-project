@@ -23,23 +23,27 @@ packet_t get_packet() {
   packet_t p;
   uint8_t buf[sizeof(packet_t)];
   while (1) {
-    spi_receive(buf, sizeof(packet_t));
+    spi_receive(buf, _NETWORK_HEADER_SIZE);
     p.__start = buf[0];
     p.src = buf[1];
     p.dest = buf[2];
     p.ttl = buf[3];
     p.len = buf[4];
     p.opcode = buf[5];
+    print_packet(p);
     if (p.dest == addr) { 
       // packet is for us
-      memcpy(p.payload, buf+6, p.len);
+      spi_receive(buf+_NETWORK_HEADER_SIZE, p.len);
+      memcpy(p.payload, buf+_NETWORK_HEADER_SIZE, p.len);
+      print_packet(p);
       return p;
     } else {
       // packet is not for us, forward if possible;
       // first checked if ttl is invalid range somehow
       if (0 < p.ttl && p.ttl <= _NETWORK_TTL_INIT) {
+        printf("forwarding packet\n");
         buf[3]--;
-        spi_transmit(buf, 6+p.len);
+        spi_transmit(buf, _NETWORK_HEADER_SIZE+p.len);
       }
       // ttl = 0 means packet dropped
     }
@@ -67,6 +71,7 @@ void print_packet(packet_t p) {
   printf("=== PACKET RECIEVED ===\n");
   printf("---> src: %d, dest: %d\n", p.src, p.dest);
   printf("---> TTL: %d, data: %d bytes\n", p.ttl, p.len);
+  printf("---> opcode: %d\n", p.opcode);
   printf("---> Data: %s\n", p.payload);
 }
 
