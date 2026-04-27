@@ -27,7 +27,7 @@ packet_t get_packet() {
   uint8_t buf[sizeof(packet_t)];
   while (1) {
     printf("reciving next bytes\n");
-    spi_receive(buf, _NETWORK_HEADER_SIZE);
+    spi_receive(buf, _NETWORK_MAX_PACKET_SIZE);
     BULLSHIT
     printf("done\n");
     p.__start = buf[0];
@@ -37,12 +37,10 @@ packet_t get_packet() {
     p.len = buf[4];
     p.opcode = buf[5];
     if (p.dest == addr) { 
-      print_packet(p);
       // packet is for us
-      spi_receive(buf, p.len);
       BULLSHIT
+      memcpy(p.payload, buf+6, p.len);
       print_packet(p);
-      memcpy(p.payload, buf, p.len);
       return p;
     } else {
       // packet is not for us, forward if possible;
@@ -68,11 +66,9 @@ void send_packet(addr_t dest, uint8_t *data, uint8_t len, opcode_t op) {
   buf[3] = _NETWORK_TTL_INIT;
   buf[4] = len;
   buf[5] = op;
-  spi_transmit(buf, _NETWORK_HEADER_SIZE);
+  memcpy(buf+_NETWORK_HEADER_SIZE, data, len);
+  spi_transmit(buf, _NETWORK_MAX_PACKET_SIZE);
   BULLSHIT
-  if (len > 0)
-  spi_transmit(data, len);
-  BULLSHIT;
 }
 
 // print a packet in a clean way
