@@ -7,7 +7,11 @@
 #define _NETWORK_MAX_PAYLOAD_SIZE 64
 #define _NETWORK_MAX_PACKET_SIZE _NETWORK_MAX_PAYLOAD_SIZE + 5
 typedef uint8_t addr_t;
-  
+typedef enum {
+  SYN,
+  ACK,
+  DATA
+} opcode_t;
 
 // type definition for a packet
 // header: 7 bytes, payload: 64 bytes
@@ -18,17 +22,18 @@ typedef struct __attribute__((packed)) {
   addr_t dest;     // destination address (where is the packet going to)
   uint8_t ttl;     // time-to-live (drop packets that circulate the ring network for too long)
   uint8_t len;     // size of the data in the payload
+  opcode_t opcode; // opcode
   uint8_t payload[_NETWORK_MAX_PAYLOAD_SIZE];
 } packet_t;
 
 // initialize the network
-void net_init();
+void net_init(addr_t a);
 
 // get the next packet from the packet buffer
 packet_t get_packet();
 
 // send a packet onto the ring network
-void send_packet(addr_t src, addr_t dest, uint8_t *data, uint8_t len);
+void send_packet(addr_t dest, uint8_t *data, uint8_t len, opcode_t op);
 
 // print it
 void print_packet(packet_t p);

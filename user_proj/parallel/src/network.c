@@ -4,46 +4,62 @@
 #include <string.h>
 #include <stdio.h>
 
+// hard-coded address
+static addr_t addr = 1;
 // initialize everything we need here
-void net_init() {
+void net_init(addr_t a) {
   spi_init(LINK_IN);
   spi_init(LINK_OUT);
+  addr = a;
 }
 
 inline uint8_t packet_size(packet_t p) {
-  return 4 + p.len;
+  return 5 + p.len;
 }
 
+// block until we recieve a packet, forwarding
+// irrelevant packets as we go
 packet_t get_packet() {
   packet_t p;
   uint8_t buf[sizeof(packet_t)];
-
-  spi_receive(buf, sizeof(packet_t));
-
-  p.__start = buf[0];
-  p.src = buf[1];
-  p.dest = buf[2];
-  p.ttl = buf[3];
-  p.len = buf[4];
-
-  memcpy(p.payload, buf+5, p.len);
+  while (1) {
+    spi_receive(buf, sizeof(packet_t));
+    p.__start = buf[0];
+    p.src = buf[1];
+    p.dest = buf[2];
+    p.ttl = buf[3];
+    p.len = buf[4];
+    p.opcode = buf[5];
+    if (p.dest == addr) { 
+      // packet is for us
+      memcpy(p.payload, buf+6, p.len);
+      return p;
+    } else {
+      // packet is not for us, forward if possible;
+      // first checked if ttl is invalid range somehow
+      if (0 < p.ttl && p.ttl <= _NETWORK_TTL_INIT) {
+        buf[3]--;
+        spi_transmit(buf, 6+p.len);
+      }
+      // ttl = 0 means packet dropped
+    }
+  }
   
-  return p;
 }
 
 // send `len` bytes, from `src`, to `dest`
-void send_packet(addr_t src, addr_t dest, uint8_t *data, uint8_t len) {
+void send_packet(addr_t dest, uint8_t *data, uint8_t len, opcode_t op) {
   uint8_t buf[_NETWORK_MAX_PACKET_SIZE];
 
   buf[0] = _NETWORK_START_BYTE;
-  buf[1] = src;
+  buf[1] = addr;
   buf[2] = dest;
   buf[3] = _NETWORK_TTL_INIT;
   buf[4] = len;
+  buf[5] = op;
+  if (len > 0)  memcpy(buf+6, data, len);
 
-  memcpy(buf+5, data, len);
-
-  spi_transmit(buf, 5+len);
+  spi_transmit(buf, 6+len);
 }
 
 // print a packet in a clean way

@@ -4,24 +4,32 @@
 #include <packet.h>
 #include <network.h>
 #include <string.h>
+#include <tinimpi.h>
+#include <stdio.h>
 
 int main(UNUSED int argc, UNUSED char const *argv[]) {
-  net_init();
+  net_init(1);
 
   // transmission
   //char *s = "hello";
 
   // transmit
+  tag_t t = 16;
+  rank_t one = 1;
+  rank_t two = 2;
+  char *msg = "nayeon pop pop!";
+  uint16_t len = strlen(msg);
   while (1) {
-    char *s = "Hello, 15-418! stfu";
-    send_packet(1, 2, (uint8_t*)s, strlen(s));
-    for (int i = 0; i < 10000; i++);
+    tinimpi_send(two, t, (uint8_t*)msg, len);
+    for (int i = 0; i < 100000; i++);
   }
 
   // receive
-/*   while (1) {
-    packet_t p = get_packet();
-    print_packet(p);
+  char buf[256];
+  uint16_t out_len;
+  while (1) {
+    tinimpi_recv(one, t, (uint8_t *)buf, 256, &out_len);
+    printf("message: %s\n", buf);
     for (int i = 0; i < 10000; i++);
-  } */
+  } 
 }
