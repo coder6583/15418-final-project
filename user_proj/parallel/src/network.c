@@ -33,8 +33,8 @@ packet_t get_packet() {
     print_packet(p);
     if (p.dest == addr) { 
       // packet is for us
-      spi_receive(buf+_NETWORK_HEADER_SIZE, p.len);
-      memcpy(p.payload, buf+_NETWORK_HEADER_SIZE, p.len);
+      spi_receive(buf, p.len);
+      memcpy(p.payload, buf, p.len);
       print_packet(p);
       return p;
     } else {
