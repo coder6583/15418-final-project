@@ -3,8 +3,11 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <topology.h>
+#include <stdbool.h>
+#include <sleep.h>
 
-#define DEBUG_MPI 0
+#define DEBUG_MPI 1
 
 #if DEBUG_MPI
 #define MPI_DEBUG(...) printf(__VA_ARGS__)
@@ -72,6 +75,51 @@ void tinimpi_recv(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, ui
   buf[*out_len] = '\0';
 }
 
+void print_checklist(const bool *c, const int len) {
+  printf("[CHECKLIST]\n");
+  for (int i = 0; i < len; i++) {
+    if (c[i])
+      printf("%d: [x]\n", i);
+    else
+      printf("%d: [ ]\n", i);
+  }
+}
+
 void tinimpi_barrier() {
-  rank_t checklist[]
+  addr_t me = get_addr();
+  // create the checklist
+  bool checklist[TOPOLOGY]; 
+
+  // initialize it
+  for(int i = 0; i < TOPOLOGY; i++) checklist[i] = false;
+
+  // this node reached the barrier, so we automatically check ourselves
+  checklist[me] = true;
+
+  // if we are not the first to reach the barrier, don't wait and send right away.
+  send_packet(BROADCAST, NULL, 0, BARRIER);
+
+  while (1) {
+    packet_t p = get_packet();
+    // wait for other nodes to broadcast themselves
+    if (p.dest == BROADCAST && p.opcode == BARRIER && !checklist[p.src]) {
+      checklist[p.src] = true;
+      send_packet(BROADCAST, NULL, 0, BARRIER);
+    }
+
+    // check if everyone has responded
+    bool done = true;
+    for (int i = 0; i < TOPOLOGY; i++) {
+      if (!checklist[i]) {
+        done = false;
+        break;
+      }
+    }
+    if (done) {
+ //     print_checklist(checklist, TOPOLOGY);
+      sleep(10);
+      send_packet(BROADCAST, NULL, 0, BARRIER);
+      break;
+    }
+  }
 }

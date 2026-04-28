@@ -6,7 +6,7 @@
 #include <tinimpi.h>
 
 // hard-coded address
-static addr_t addr = 1;
+static addr_t addr = 0;
 // initialize everything we need here
 void net_init(addr_t a) {
   spi_init(LINK_IN);
@@ -40,11 +40,12 @@ packet_t get_packet() {
       // packet is not for us, forward if possible;
       // first checked if ttl is invalid range somehow
       if (0 < p.ttl && p.ttl <= _NETWORK_TTL_INIT) {
-        printf("forwarding packet\n");
         buf[3]--;
         spi_transmit(buf, _NETWORK_HEADER_SIZE+p.len);
       }
-      if (p.dest == BROADCAST) return p;
+      if (p.dest == BROADCAST) {
+        return p;
+      }
       // ttl = 0 means packet dropped
     }
   }  
@@ -86,5 +87,5 @@ void print_packet(packet_t p) {
   printf("---> Data: %s\n", p.payload);
 }
 
-
+addr_t get_addr() { return addr; }
 

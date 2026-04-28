@@ -1,6 +1,7 @@
 #ifndef _NETWORK_H
 #define _NETWORK_H
 #include <stdint.h>
+#include <stdbool.h>
 
 #define _NETWORK_START_BYTE 0x73
 #define _NETWORK_TTL_INIT 16
@@ -43,4 +44,7 @@ void send_packet(addr_t dest, uint8_t *data, uint8_t len, opcode_t op);
 
 // print it
 void print_packet(packet_t p);
+
+// get my own addr
+addr_t get_addr();
 #endif

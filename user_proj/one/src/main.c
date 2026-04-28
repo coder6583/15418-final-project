@@ -10,25 +10,23 @@
 #include <stdint.h>
 #include <topology.h>
 
-const rank_t rank = one;
 
 void thread_entry() {
   tag_t t = 16;
 
   char *msg = "nayeon pop pop!";
-  char buf[256];
-// tinimpi_send(two, t, (uint8_t*)msg, len);    
-  for (int i = 0; i < 10; i++) {
-    snprintf(buf, 256, "%s part %d!", msg, i);
-    uint16_t len = strlen(buf);
-    tinimpi_send(two, t, (uint8_t*)buf, len);
-    sleep(1000);
-  }
+  uint16_t len = strlen(msg);
+  tinimpi_send(NODE_TWO, t, (uint8_t*)msg, len);
+  printf("haha! i will be entering sleep for 5 seconds!\n");
+  sleep(5000);
+  printf("now, i enter barrier!\n");
+  tinimpi_barrier();
+  printf("Exiting barrier!\n");
   while (1);
 }
 
 int main(UNUSED int argc, UNUSED char const *argv[]) {
-   net_init(rank);
+   net_init(NODE_ONE);
    thread_init(1, 256, NULL, 0);
    thread_create(&thread_entry, 0, 1, 1, NULL);
    scheduler_start(1000); // just the default thread;

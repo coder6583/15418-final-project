@@ -3,10 +3,10 @@
 #include <tinimpi.h>
 #include <network.h>
 
-const rank_t one = 1;
-const rank_t two = 2;
+#define NODE_ONE 0
+#define NODE_TWO 1
 
 // number of nodes in the topology
-#define TOPOLOGY = 2;
+#define TOPOLOGY 2
 
 #endif
