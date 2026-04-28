@@ -118,11 +118,12 @@ else
 endif
 
 ARCH                 = $(ARG) $(FLOAT_ARCH) -mslow-flash-data -mcpu=cortex-m4 -mlittle-endian -mthumb -ffreestanding
-COMPILER_ERROR_FLAGS = -std=gnu99 -Wall -Werror -Wshadow -Wextra -Wunused -Wno-unused-value
+COMPILER_ERROR_FLAGS = -std=gnu99 -Wall -Werror -Wshadow -Wextra -Wunused
 C_LIB_FLAG           = -nostdlib
 CCFLAGS              += $(ARCH) $(COMPILER_ERROR_FLAGS) $(C_LIB_FLAG) $(OPTIMIZATION) $(DEFINE_MACROS)
 K_CCFLAGS            = $(CCFLAGS) -nostartfiles
 U_CCFLAGS            = $(CCFLAGS)
+GDB_PORT             = 4444
 
 ########################################################
 
@@ -199,18 +200,32 @@ getargs:
 
 build : getargs setup compile
 
-flash:	build
+flash_a:	build
 	cp util/init_template.nc /tmp/init.nc
 	sed -i -e 's|<template>|$(BINARY)|g' /tmp/init.nc
 	cp util/init_template.gdb /tmp/init.gdb
 	sed -i -e 's|<template>|$(BINARY)|g' /tmp/init.gdb
 	@printf "\n"
 	@printf "$y***************************************************************\n$n"
-	@printf "$yFlashing $(BINARY) to board...\n$n"
+	@printf "$yFlashing $(BINARY) to board A...\n$n"
 	@printf "$y***************************************************************\n$n"
 	cat /tmp/init.nc | nc localhost 4444 $(NC_FLAGS)
 	@printf "Opening GDB...\n"
 	$(GDB) -x /tmp/init.gdb
+
+flash_b:	build
+	cp util/init_template.nc /tmp/init.nc
+	sed -i -e 's|<template>|$(BINARY)|g' /tmp/init.nc
+	cp util/init_template_b.gdb /tmp/init_b.gdb
+	sed -i -e 's|<template>|$(BINARY)|g' /tmp/init_b.gdb
+	@printf "\n"
+	@printf "$y***************************************************************\n$n"
+	@printf "$yFlashing $(BINARY) to board B...\n$n"
+	@printf "$y***************************************************************\n$n"
+	cat /tmp/init.nc | nc localhost 4445 $(NC_FLAGS)
+	@printf "Opening GDB...\n"
+	$(GDB) -x /tmp/init_b.gdb
+
 
 view-dump: build dump
 
