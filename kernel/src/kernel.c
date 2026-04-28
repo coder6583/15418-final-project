@@ -84,7 +84,6 @@ int kernel_main(void) {
     init_349(); // DO NOT REMOVE THIS LINE
     uart_init(UART_USARTDIV);
     enable_fpu();
-
     // struct pin left_motor_in1 = {.port=MOTORA_IN1_PORT, .num=MOTORA_IN1_NUM, .irq_num=0};
     // struct pin left_motor_in2 = {.port=MOTORA_IN2_PORT, .num=MOTORA_IN2_NUM, .irq_num=0};
     // struct pin left_motor_en = {.port=MOTORA_EN_PORT, .num=MOTORA_EN_NUM, .irq_num=0};

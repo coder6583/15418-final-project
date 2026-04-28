@@ -66,4 +66,6 @@
 #define SVC_SPI_TRANSMIT 31
 #define SVC_SPI_RECEIVE 32
 
+#define SVC_SLEEP 33
+
 #endif /* _SVC_NUM_H_ */

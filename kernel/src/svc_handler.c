@@ -12,6 +12,7 @@
 #include <debug.h>
 #include <svc_num.h>
 #include <syscall.h>
+#include <systick.h>
 #include <syscall_thread.h>
 #include <motor_driver.h>
 #include <stdlib.h>
@@ -97,6 +98,9 @@ void svc_c_handler(uint32_t *svc_addr, uint32_t *stack_frame ) {
     case SVC_SPI_RECEIVE:
         sys_spi_receive((void*)r0, (uint32_t)r1);
         return;
+    case SVC_SLEEP:
+	systick_delay(r0);
+	return;
     default:
         return;
     }

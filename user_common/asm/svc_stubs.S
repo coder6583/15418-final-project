@@ -162,3 +162,8 @@ spi_transmit:
 spi_receive:
   svc #SVC_SPI_RECEIVE
   bx lr
+
+.global sleep
+sleep:
+  svc #SVC_SLEEP
+  bx lr

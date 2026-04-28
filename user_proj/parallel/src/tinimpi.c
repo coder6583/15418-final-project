@@ -22,9 +22,14 @@ void tinimpi_send(rank_t dest, tag_t tag, uint8_t *buf, uint16_t len) {
   // wait for ACK
   MPI_DEBUG("waiting for ACK from %d...\n", dest);
   while (1) {
-    p = get_packet();
-    if (p.src == dest && p.opcode == ACK) break;// nayeon pop pop
-    MPI_DEBUG("recieved ACK from %d!\n", dest);
+    p = get_packet(false);
+    if (p.src == dest && p.opcode == ACK) {
+      MPI_DEBUG("recieved ACK from %d!\n", dest);
+      break;
+    }
+    sleep(1000);// sleep for 1s. while sleeping,
+    send_packet(dest, header_data, 1, SYN);
+    // should still be able to recieve packets and update internal buffer
   }
   // now, send data
   MPI_DEBUG("Sending data to %d!\n", dest);
