@@ -106,10 +106,10 @@ void sys_spi_init(uint8_t link_id) {
 
     // Set slave mode
     spi -> CR1 |= SPI_SLAVE;
+    spi -> CR1 |= SPI_BR_DIV256;
 
     // Enable SPI
     spi -> CR1 |= SPI_EN;
-
     while (spi -> SR & SPI_SR_RXNE) {
       volatile uint8_t dummy;
       dummy = *((volatile uint8_t *)&spi -> DR);
@@ -133,6 +133,7 @@ void sys_spi_init(uint8_t link_id) {
 
     // Set the data frame format
     spi -> CR1 |= SPI_DFF_8BIT;
+    spi -> CR1 |= SPI_BR_DIV256;
 
     // CPOL = 0, CPHA = 0
     spi -> CR1 |= SPI_CPOL_LOW;
@@ -166,8 +167,8 @@ void sys_spi_transmit(uint8_t *tx_data, uint32_t len) {
   struct spi_reg_map *spi = SPI3_BASE;
 
   // Chip select
+//  __asm("bkpt");
   gpio_clr(GPIO_A, 10);
-
   // Make sure there's nothing transmitting currently
   while (!(spi -> SR & SPI_SR_TXE));
 

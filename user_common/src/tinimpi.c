@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#define DEBUG_MPI 1
+#define DEBUG_MPI 0
 
 #if DEBUG_MPI
 #define MPI_DEBUG(...) printf(__VA_ARGS__)
@@ -23,8 +23,11 @@ void tinimpi_send(rank_t dest, tag_t tag, uint8_t *buf, uint16_t len) {
   MPI_DEBUG("waiting for ACK from %d...\n", dest);
   while (1) {
     p = get_packet();
-    if (p.src == dest && p.opcode == ACK) break;// nayeon pop pop
-    MPI_DEBUG("recieved ACK from %d!\n", dest);
+    if (p.src == dest && p.opcode == ACK) {
+      MPI_DEBUG("recieved ACK from %d!\n", dest);
+      break;
+    }
+    // should still be able to recieve packets and update internal buffer
   }
   // now, send data
   MPI_DEBUG("Sending data to %d!\n", dest);
@@ -39,7 +42,7 @@ void tinimpi_recv(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, ui
   MPI_DEBUG("waiting for SYN from %d...\n", src);
   while (1) {
     p = get_packet();
-    if (p.src == src && p.opcode == SYN) {
+    if (p.src == src && p.opcode == SYN && p.payload[0] == tag) {
       MPI_DEBUG("recieved SYN from %d!\n", src);
       MPI_DEBUG("--> tag is [%d](%c)\n", tag, (char)(tag+'0'));
       break;
@@ -66,5 +69,9 @@ void tinimpi_recv(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, ui
     *out_len = p.len;
 
   memcpy(buf, p.payload, *out_len);
+  buf[*out_len] = '\0';
 }
 
+void tinimpi_barrier() {
+  rank_t checklist[]
+}

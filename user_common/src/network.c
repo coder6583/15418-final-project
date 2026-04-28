@@ -3,8 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
-
-#define BULLSHIT for(int i = 0; i < 100000; i++);
+#include <tinimpi.h>
 
 // hard-coded address
 static addr_t addr = 1;
@@ -13,7 +12,6 @@ void net_init(addr_t a) {
   spi_init(LINK_IN);
   spi_init(LINK_OUT);
   addr = a;
-  printf("addr is %d\n", addr);
 }
 
 inline uint8_t packet_size(packet_t p) {
@@ -24,22 +22,19 @@ inline uint8_t packet_size(packet_t p) {
 // irrelevant packets as we go
 packet_t get_packet() {
   packet_t p;
-  uint8_t buf[sizeof(packet_t)];
+  uint8_t buf[_NETWORK_MAX_PACKET_SIZE];
   while (1) {
-    printf("reciving next bytes\n");
     spi_receive(buf, _NETWORK_MAX_PACKET_SIZE);
-    BULLSHIT
-    printf("done\n");
     p.__start = buf[0];
     p.src = buf[1];
     p.dest = buf[2];
     p.ttl = buf[3];
     p.len = buf[4];
     p.opcode = buf[5];
+    memcpy(p.payload, buf+6, p.len);
+    p.payload[p.len] = '\0';
+//    print_packet(p);
     if (p.dest == addr) { 
-      // packet is for us
-      memcpy(p.payload, buf+6, p.len);
-      print_packet(p);
       return p;
     } else {
       // packet is not for us, forward if possible;
@@ -49,10 +44,10 @@ packet_t get_packet() {
         buf[3]--;
         spi_transmit(buf, _NETWORK_HEADER_SIZE+p.len);
       }
+      if (p.dest == BROADCAST) return p;
       // ttl = 0 means packet dropped
     }
-  }
-  
+  }  
 }
 
 // send `len` bytes, from `src`, to `dest`
@@ -67,7 +62,6 @@ void send_packet(addr_t dest, uint8_t *data, uint8_t len, opcode_t op) {
   buf[5] = op;
   if (data != NULL) memcpy(buf+_NETWORK_HEADER_SIZE, data, len);
   spi_transmit(buf, _NETWORK_MAX_PACKET_SIZE);
-  BULLSHIT
 }
 
 // print a packet in a clean way
@@ -75,7 +69,20 @@ void print_packet(packet_t p) {
   printf("=== PACKET RECIEVED ===\n");
   printf("---> src: %d, dest: %d\n", p.src, p.dest);
   printf("---> TTL: %d, data: %d bytes\n", p.ttl, p.len);
-  printf("---> opcode: %d\n", p.opcode);
+  switch (p.opcode) {
+    case SYN: 
+      printf("---> opcode: SYN\n");
+      break;
+    case ACK: 
+      printf("---> opcode: ACK\n");
+      break;
+    case DATA: 
+      printf("---> opcode: DATA\n");
+      break;
+    case BARRIER:
+      printf("---> opcode: BARRIER\n");
+      break;
+  }
   printf("---> Data: %s\n", p.payload);
 }
 

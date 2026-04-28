@@ -10,10 +10,14 @@
 typedef uint8_t addr_t;
 typedef uint8_t opcode_t;
 
+/* packet opcode definitions */
 #define SYN 0
 #define ACK 1
 #define DATA 2
+#define BARRIER 3
 
+/* special addresses */
+#define BROADCAST 255
 
 // type definition for a packet
 // header: 7 bytes, payload: 64 bytes
