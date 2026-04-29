@@ -296,28 +296,6 @@ void sys_spi_receive(uint8_t *rx_data, uint32_t len) {
 void sys_spi_transmit(uint8_t *tx_data, uint32_t len) {
   while(sys_spi_tx_queue_full());
   sys_spi_tx_queue_push(tx_data, len);
-  // struct spi_reg_map *spi = SPI3_BASE;
-  // struct dma_stream_reg_map *s = DMA1_S5_BASE;
-
-  // gpio_clr(GPIO_A, 10);
-  // // while (gpio_read(GPIO_C, 7) == 1);
-  // BULLSHIT
-
-  // DMA1_BASE->HIFCR = DMA_HIFCR_CTCIF5;
-  // s->M0AR = (uint32_t)tx_data;
-  // s->NDTR = len;
-  // spi->CR2 |= SPI_CR2_TXDMAEN;
-  // s->CR |= DMA_CR_EN;
-
-  // while (!(DMA1_BASE->HISR & DMA_HISR_TCIF5));
-  // DMA1_BASE->HIFCR = DMA_HIFCR_CTCIF5;
-
-  // s->CR &= ~DMA_CR_EN;
-  // spi->CR2 &= ~SPI_CR2_TXDMAEN;
-
-  // while (spi->SR & SPI_SR_BSY);
-
-  // gpio_set(GPIO_A, 10);
 }
 
 int sys_spi_tx_queue_full(void) {

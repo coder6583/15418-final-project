@@ -10,8 +10,23 @@
 #include <349_peripheral.h>
 #include <349_threads.h>
 
-#define MAX_PENDING 4
-static volatile recv_req_t pending[MAX_PENDING];
+static recv_req_t pending;
+
+void tinimpi_init() {
+    pending.active = 0;
+    pending.done   = 0;
+}
+
+static packet_t wait_for(rank_t src, uint8_t opcode, tag_t tag) {
+    pending.src    = src;
+    pending.opcode = opcode;
+    pending.tag    = tag;
+    pending.done   = 0;
+    pending.active = 1;
+    while (!pending.done);
+    pending.active = 0;
+    return pending.result;
+}
 
 #define DEBUG_MPI 1
 
@@ -148,17 +163,60 @@ void tinimpi_barrier() {
 }
 
 void tinimpi_thread() {
-  while(1) {
-    if (spi_rx_ready()) {
-      printf("received smth\n");
-      uint8_t buf[72];
-      spi_rx_dequeue(buf, 71);
-      packet_t p = build_packet(buf);
-      print_packet(p);
-      
-      // if (p.src == src && p.opcode == SYN && p.payload[0])
+    while (1) {
+        packet_t p;
+        if (handle_packet(&p) && pending.active && !pending.done) {
+            int src_match = (pending.src == BROADCAST) || (pending.src == p.src);
+            int op_match  = (pending.opcode == p.opcode);
+            int tag_match = (p.opcode != SYN) || (pending.tag == p.payload[0]);
+            if (src_match && op_match && tag_match) {
+                pending.result = p;
+                pending.done   = 1;
+            }
+        }
+        spi_progress_tx();
+        wait_until_next_period();
     }
-    spi_progress_tx();
-    wait_until_next_period();
-  }
+}
+
+/* ── pending-slot versions of send/recv ──────────────────────────────────── */
+
+void tinimpi_send2(rank_t dest, tag_t tag, uint8_t *buf, uint16_t len) {
+    uint8_t header_data[] = { tag, (len >> 8) & 0xFF, len & 0xFF };
+    MPI_DEBUG("sending SYN to rank %d, tag=%d\n", dest, tag);
+    send_packet(dest, header_data, 3, SYN, 0);
+
+    MPI_DEBUG("waiting for ACK from %d...\n", dest);
+    wait_for(dest, ACK, 0);
+    MPI_DEBUG("received ACK from %d!\n", dest);
+
+    MPI_DEBUG("sending data to %d!\n", dest);
+    for (uint16_t offset = 0; offset < len; offset += _NETWORK_MAX_PAYLOAD_SIZE) {
+        uint16_t chunk = len - offset;
+        if (chunk > _NETWORK_MAX_PAYLOAD_SIZE) chunk = _NETWORK_MAX_PAYLOAD_SIZE;
+        send_packet(dest, buf + offset, chunk, DATA, offset / _NETWORK_MAX_PAYLOAD_SIZE);
+    }
+}
+
+void tinimpi_recv2(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, uint16_t *out_len) {
+    MPI_DEBUG("waiting for SYN from %d...\n", src);
+    packet_t p = wait_for(src, SYN, tag);
+    uint16_t expected_len = ((uint16_t)p.payload[1] << 8) | p.payload[2];
+    MPI_DEBUG("received SYN from %d, expecting %d bytes\n", src, expected_len);
+
+    MPI_DEBUG("sending ACK to rank %d...\n", src);
+    send_packet(src, NULL, 0, ACK, 0);
+
+    *out_len = 0;
+    uint8_t last_seq = expected_len / _NETWORK_MAX_PAYLOAD_SIZE;
+    while (1) {
+        p = wait_for(src, DATA, 0);
+        MPI_DEBUG("received data from %d, seq=%d len=%d\n", src, p.seq, p.len);
+        memcpy(buf + (p.seq * _NETWORK_MAX_PAYLOAD_SIZE), p.payload, p.len);
+        *out_len += p.len;
+        if (p.seq == last_seq) break;
+    }
+
+    if (*out_len > buf_capacity) *out_len = buf_capacity;
+    buf[*out_len] = '\0';
 }

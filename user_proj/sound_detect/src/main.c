@@ -17,12 +17,16 @@ void computation() {
 
   char *msg = "nayeon pop pop! 1 2 3 4 5 6 7, you make me feel like eleven! baby, i'm just trying to play it cool";
   uint16_t len = strlen(msg);
-  tinimpi_send(NODE_TWO, t, (uint8_t*)msg, len);
+  char recv[127];
+  uint16_t out_len;
+  tinimpi_send2(NODE_TWO, t, (uint8_t*)msg, len);
+  tinimpi_recv2(NODE_ONE, t, (uint8_t*)recv, 127, &out_len);
   
   while (1);
 }
 
 int main(UNUSED int argc, UNUSED char const *argv[]) {
+  tinimpi_init();
   net_init(NODE_ONE);
   thread_init(1, 256, &computation, 0);
   thread_create(&tinimpi_thread, 0, 1, 1, NULL);

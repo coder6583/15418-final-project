@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <tinimpi.h>
+#include <349_peripheral.h>
 
 // hard-coded address
 static addr_t addr = 0;
@@ -66,6 +67,36 @@ packet_t get_packet() {
       // ttl = 0 means packet dropped
     }
   }  
+}
+
+int handle_packet(packet_t *out_p) {
+  if (spi_rx_ready()) {
+    printf("received smth\n");
+    uint8_t buf[72];
+    spi_rx_dequeue(buf, 71);
+    packet_t p = build_packet(buf);
+    print_packet(p);
+    
+    if (p.dest == addr) {
+      *out_p = p;
+      return 1; 
+    } else if (p.dest == BROADCAST && p.src == addr) {
+      return 0;
+    } else {
+      printf("does it goes in here wtf\n");
+      if (0 < p.ttl && p.ttl <= _NETWORK_TTL_INIT) {
+        buf[3]--;
+        while(spi_tx_queue_full());
+        spi_tx_queue_push(buf, _NETWORK_MAX_PACKET_SIZE);
+      }
+      if (p.dest == BROADCAST) {
+        *out_p = p;
+        return 1;
+      }
+    }
+    // if (p.src == src && p.opcode == SYN && p.payload[0])
+  }
+  return 0;
 }
 
 // send `len` bytes, from `src`, to `dest`
