@@ -28,7 +28,16 @@ struct spi_reg_map {
 
 #define SPI_MASTER       (1 << 2)
 #define SPI_SLAVE        (0 << 2)
+
+#define SPI_BR_DIV2      (0 << 3)
+#define SPI_BR_DIV4      (1 << 3)
+#define SPI_BR_DIV8      (2 << 3)
+#define SPI_BR_DIV16     (3 << 3)
+#define SPI_BR_DIV32     (4 << 3)
+#define SPI_BR_DIV64     (5 << 3)
+#define SPI_BR_DIV128    (6 << 3)
 #define SPI_BR_DIV256    (7 << 3)
+
 #define SPI_CPOL_LOW     (0 << 1)
 #define SPI_CPHA_FIRST   (0)
 #define SPI_DFF_8BIT     (0 << 11)
