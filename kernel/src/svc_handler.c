@@ -125,6 +125,9 @@ void svc_c_handler(uint32_t *svc_addr, uint32_t *stack_frame ) {
     case SVC_MUT_ULK:
         sys_mutex_unlock((void*)r0);
         return;
+    case SVC_GET_RANK:
+        r = (uint8_t)sys_get_rank();
+        break;
     default:
         return;
     }

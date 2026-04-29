@@ -10,6 +10,19 @@
 #include <stdint.h>
 #include <topology.h>
 
+rank_t rank;
+
+rank_t get_next_rank() {
+  return (rank + 1) % 2;
+}
+
+rank_t get_prev_rank() {
+  if (rank == 0) {
+    return 1;
+  }
+  return rank - 1;
+}
+
 void computation() {
   tag_t t = 16;
 
@@ -19,17 +32,15 @@ void computation() {
   uint16_t len = strlen(msg);
   char recv[127];
   uint16_t out_len;
-  tinimpi_send2(NODE_TWO, t, (uint8_t*)msg, len);
-  tinimpi_recv2(NODE_ONE, t, (uint8_t*)recv, 127, &out_len);
+  tinimpi_send2(get_next_rank(), t, (uint8_t*)msg, len);
+  tinimpi_recv2(get_prev_rank(), t, (uint8_t*)recv, 127, &out_len);
+  recv[out_len] = '\0';
+  printf("Recieved message over tiniMPI: %s\n", recv);
   
   while (1);
 }
 
 int main(UNUSED int argc, UNUSED char const *argv[]) {
-  tinimpi_init();
-  net_init(NODE_ONE);
-  thread_init(1, 256, &computation, 0);
-  thread_create(&tinimpi_thread, 0, 1, 1, NULL);
-  scheduler_start(1000); // just the default thread;
+  tinimpi_init(&rank, &computation);
   while(1);
 }

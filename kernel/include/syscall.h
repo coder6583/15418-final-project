@@ -21,4 +21,6 @@ int sys_read(int file, char *ptr, int len);
 
 void sys_exit(int status);
 
+int sys_get_rank(void);
+
 #endif /* _SYSCALLS_H_ */

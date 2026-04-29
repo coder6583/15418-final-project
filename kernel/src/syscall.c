@@ -15,6 +15,7 @@
 #include <systick.h>
 #include <arm.h>
 #include "printk.h"
+#include <gpio.h>
 
 extern char __heap_low;
 extern char __heap_top;
@@ -90,4 +91,9 @@ void sys_exit(UNUSED int status){
     uart_flush();
 //    save_interrupt_state_and_disable();
     while (1);
+}
+
+int sys_get_rank(void) {
+    gpio_init(GPIO_A, 0, MODE_INPUT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_PULL_DOWN, ALT0);
+    return gpio_read(GPIO_A, 0);
 }

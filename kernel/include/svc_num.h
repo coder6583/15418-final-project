@@ -75,4 +75,6 @@
 #define SVC_SPI_TX_QUEUE_FULL 37
 #define SVC_SPI_PROGRESS_TX 38
 
+#define SVC_GET_RANK 39
+
 #endif /* _SVC_NUM_H_ */

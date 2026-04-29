@@ -192,3 +192,8 @@ spi_tx_queue_full:
 spi_progress_tx:
   svc #SVC_SPI_PROGRESS_TX
   bx lr
+
+.global get_rank
+get_rank:
+  svc #SVC_GET_RANK
+  bx lr

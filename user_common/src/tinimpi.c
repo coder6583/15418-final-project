@@ -12,9 +12,15 @@
 
 static recv_req_t pending;
 
-void tinimpi_init() {
-    pending.active = 0;
-    pending.done   = 0;
+void tinimpi_init(rank_t *rank, void (*idle_func)()) {
+  pending.active = 0;
+  pending.done   = 0;
+  *rank = get_rank();
+  printf("rank %d\n", *rank);
+  net_init(*rank);
+  thread_init(1, 256, idle_func, 0);
+  thread_create(&tinimpi_thread, 0, 1, 1, NULL);
+  scheduler_start(1000); // just the default thread;
 }
 
 static packet_t wait_for(rank_t src, uint8_t opcode, tag_t tag) {

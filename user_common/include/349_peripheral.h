@@ -56,5 +56,6 @@ int spi_tx_queue_full();
 int spi_tx_queue_push(uint8_t *buf, uint32_t len);
 void spi_progress_tx();
 
+uint8_t get_rank();
 
 #endif /* _349_PERIPHERAL_H */
