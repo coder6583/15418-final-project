@@ -6,8 +6,8 @@
 #define _NETWORK_START_BYTE 0x73
 #define _NETWORK_TTL_INIT 2
 #define _NETWORK_MAX_PAYLOAD_SIZE 64
-#define _NETWORK_HEADER_SIZE 7
-#define _NETWORK_MAX_PACKET_SIZE _NETWORK_MAX_PAYLOAD_SIZE + 7
+#define _NETWORK_HEADER_SIZE 6
+#define _NETWORK_MAX_PACKET_SIZE _NETWORK_MAX_PAYLOAD_SIZE + 6
 typedef uint8_t addr_t;
 typedef uint8_t opcode_t;
 
@@ -30,7 +30,6 @@ typedef struct __attribute__((packed)) {
   uint8_t ttl;     // time-to-live (drop packets that circulate the ring network for too long)
   uint8_t len;     // size of the data in the payload
   opcode_t opcode; // opcode
-  uint8_t seq;     // packet index for payloads with over max packet size
   uint8_t payload[_NETWORK_MAX_PAYLOAD_SIZE];
 } packet_t;
 
@@ -41,7 +40,7 @@ void net_init(addr_t a);
 packet_t get_packet();
 
 // send a packet onto the ring network
-void send_packet(addr_t dest, uint8_t *data, uint8_t len, opcode_t op, uint8_t seq);
+void send_packet(addr_t dest, uint8_t *data, uint8_t len, opcode_t op);
 
 // print it
 void print_packet(packet_t p);

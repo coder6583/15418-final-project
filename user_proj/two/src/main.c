@@ -36,9 +36,9 @@ uint8_t v[N] = {
 void thread_entry() {
  tag_t t = 16;
 
-  char buf[128];
+  char buf[256];
   uint16_t out_len;
-  tinimpi_recv(NODE_ONE, t, (uint8_t*) buf, 128, &out_len);
+  tinimpi_recv(NODE_ONE, t, (uint8_t*) buf, 256, &out_len);
   printf("Recieved message over tiniMPI: %s\n", buf); 
   printf("Entering barrier....\n");
   tinimpi_barrier();
@@ -51,10 +51,9 @@ void thread_entry() {
   while (1);
 }
 int main(UNUSED int argc, UNUSED char const *argv[]) {
-  net_init(NODE_TWO);
-  thread_init(1, 256, NULL, 0);
-  thread_create(&thread_entry, 0, 1, 1, NULL);
-  scheduler_start(1000); // just the default thread;
-  thread_entry();
-  while(1);
+   net_init(NODE_TWO);
+   thread_init(1, 256, NULL, 0);
+   thread_create(&thread_entry, 0, 1, 1, NULL);
+   scheduler_start(1000); // just the default thread;
+   while(1);
 }

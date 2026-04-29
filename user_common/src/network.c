@@ -31,8 +31,7 @@ packet_t get_packet() {
     p.ttl = buf[3];
     p.len = buf[4];
     p.opcode = buf[5];
-    p.seq = buf[6];
-    memcpy(p.payload, buf+_NETWORK_HEADER_SIZE, p.len);
+    memcpy(p.payload, buf+6, p.len);
     p.payload[p.len] = '\0';
 //    print_packet(p);
     if (p.dest == addr) { 
@@ -55,7 +54,7 @@ packet_t get_packet() {
 }
 
 // send `len` bytes, from `src`, to `dest`
-void send_packet(addr_t dest, uint8_t *data, uint8_t len, opcode_t op, uint8_t seq) {
+void send_packet(addr_t dest, uint8_t *data, uint8_t len, opcode_t op) {
   uint8_t buf[_NETWORK_MAX_PACKET_SIZE];
 
   buf[0] = _NETWORK_START_BYTE;
@@ -64,7 +63,6 @@ void send_packet(addr_t dest, uint8_t *data, uint8_t len, opcode_t op, uint8_t s
   buf[3] = _NETWORK_TTL_INIT;
   buf[4] = len;
   buf[5] = op;
-  buf[6] = seq;
   if (data != NULL) memcpy(buf+_NETWORK_HEADER_SIZE, data, len);
   spi_transmit(buf, _NETWORK_MAX_PACKET_SIZE);
 }

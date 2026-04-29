@@ -37,7 +37,7 @@ uint8_t v[N] = {
 void thread_entry() {
   tag_t t = 16;
 
-  char *msg = "nayeon pop pop! 1 2 3 4 5 6 7, you make me feel like eleven! baby, i'm just trying to play it cool";
+  char *msg = "nayeon pop pop!";
   uint16_t len = strlen(msg);
   tinimpi_send(NODE_TWO, t, (uint8_t*)msg, len);
   printf("haha! i will be entering sleep for 5 seconds!\n");
@@ -53,9 +53,9 @@ void thread_entry() {
 }
 
 int main(UNUSED int argc, UNUSED char const *argv[]) {
-  net_init(NODE_ONE);
-  thread_init(1, 256, NULL, 0);
-  thread_create(&thread_entry, 0, 1, 1, NULL);
-  scheduler_start(1000); // just the default thread;
-  while(1);
+   net_init(NODE_ONE);
+   thread_init(1, 256, NULL, 0);
+   thread_create(&thread_entry, 0, 1, 1, NULL);
+   scheduler_start(1000); // just the default thread;
+   while(1);
 }
