@@ -18,6 +18,20 @@ inline uint8_t packet_size(packet_t p) {
   return 5 + p.len;
 }
 
+packet_t build_packet(uint8_t buf[_NETWORK_MAX_PACKET_SIZE + 1]) {
+  packet_t p;
+  p.__start = buf[0];
+  p.src = buf[1];
+  p.ttl = buf[3];
+  p.dest = buf[2];
+  p.len = buf[4];
+  p.opcode = buf[5];
+  p.seq = buf[6];
+  memcpy(p.payload, buf+_NETWORK_HEADER_SIZE, p.len);
+  p.payload[p.len] = '\0';
+  return p;
+}
+
 // block until we recieve a packet, forwarding
 // irrelevant packets as we go
 packet_t get_packet() {

@@ -40,6 +40,8 @@ void net_init(addr_t a);
 // get the next packet from the packet buffer
 packet_t get_packet();
 
+packet_t build_packet(uint8_t data[_NETWORK_MAX_PACKET_SIZE + 1]);
+
 // send a packet onto the ring network
 void send_packet(addr_t dest, uint8_t *data, uint8_t len, opcode_t op, uint8_t seq);
 

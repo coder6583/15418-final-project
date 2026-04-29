@@ -49,4 +49,8 @@ void lcd_clear_scr();
 void lcd_print(char *str);
 void lcd_set_cursor(uint8_t row, uint8_t col);
 
+int spi_rx_ready();
+int spi_rx_dequeue(uint8_t *buf, uint32_t len);
+
+
 #endif /* _349_PERIPHERAL_H */

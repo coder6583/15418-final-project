@@ -167,3 +167,13 @@ spi_receive:
 sleep:
   svc #SVC_SLEEP
   bx lr
+
+.global spi_rx_ready
+spi_rx_ready:
+  svc #SVC_SPI_RX_READY
+  bx lr
+
+.global spi_rx_dequeue
+spi_rx_dequeue:
+  svc #SVC_SPI_RX_DEQUEUE
+  bx lr
