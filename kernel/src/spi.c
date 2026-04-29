@@ -135,7 +135,7 @@ void sys_spi_init(uint8_t link_id) {
     gpio_init(GPIO_A, 10, MODE_GP_OUTPUT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT0);
     // deassert NSS
     gpio_set(GPIO_A, 10);
-    gpio_init(GPIO_A, 9, MODE_INPUT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT0);
+    gpio_init(GPIO_C, 7, MODE_INPUT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT0);
 
     // Set the data frame format
     spi -> CR1 |= SPI_DFF_8BIT;
@@ -176,7 +176,7 @@ void sys_spi_transmit(uint8_t *tx_data, uint32_t len) {
 //  __asm("bkpt");
   gpio_clr(GPIO_A, 10);
 // ready is inverted signal, wait until it is asserted
-  // while (gpio_read(GPIO_A, 9) == 1);
+  // while (gpio_read(GPIO_C, 7) == 1);
   BULLSHIT
   // Make sure there's nothing transmitting currently
   while (!(spi -> SR & SPI_SR_TXE));
