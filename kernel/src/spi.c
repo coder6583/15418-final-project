@@ -3,8 +3,6 @@
 #include <rcc.h>
 #include <gpio.h>
 
-#define BULLSHIT for(int i = 0; i < 100000; i++);
-
 /** @brief The SPI register map. */
 struct spi_reg_map {
     volatile uint32_t CR1;   /**< Control Register 1 */
@@ -82,10 +80,7 @@ void sys_spi_init(uint8_t link_id) {
     // initialize SPI2_MISO line
     gpio_init(GPIO_B, 14, MODE_ALT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT5);
     // initialize SPI2_NSS line
-    gpio_init(GPIO_B, 12, MODE_ALT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT5);
-    // initialize READY line
-    gpio_init(GPIO_B, 13, MODE_GP_OUTPUT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT0);
-    gpio_set(GPIO_B, 13);
+    gpio_init(GPIO_B, 12, MODE_ALT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_PULL_UP, ALT5);
 
     // Set the data frame format
     spi -> CR1 |= SPI_DFF_8BIT;
@@ -135,7 +130,6 @@ void sys_spi_init(uint8_t link_id) {
     gpio_init(GPIO_A, 10, MODE_GP_OUTPUT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT0);
     // deassert NSS
     gpio_set(GPIO_A, 10);
-    gpio_init(GPIO_C, 7, MODE_INPUT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT0);
 
     // Set the data frame format
     spi -> CR1 |= SPI_DFF_8BIT;
@@ -174,7 +168,6 @@ void sys_spi_transmit(uint8_t *tx_data, uint32_t len) {
 
   // Chip select
 //  __asm("bkpt");
-  // ready is inverted signal, wait until it is asserted
   gpio_clr(GPIO_A, 10);
   // Make sure there's nothing transmitting currently
   while (!(spi -> SR & SPI_SR_TXE));
@@ -197,8 +190,6 @@ void sys_spi_transmit(uint8_t *tx_data, uint32_t len) {
 void sys_spi_receive(uint8_t *rx_data, uint32_t len) {
   struct spi_reg_map *spi = SPI2_BASE;
 
-  // assert READY
-  gpio_clr(GPIO_B, 13);
   while (gpio_read(GPIO_B, 12) == 1);
 
   while (spi -> SR & SPI_SR_RXNE) {
@@ -214,9 +205,7 @@ void sys_spi_receive(uint8_t *rx_data, uint32_t len) {
     rx_data[i] = *((volatile uint8_t *)&spi->DR);
   }
 
-  gpio_set(GPIO_B, 13);
   while (gpio_read(GPIO_B, 12) == 0);
-  // deasert READY
 
   return;
 }

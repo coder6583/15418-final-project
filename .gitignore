@@ -2,5 +2,3 @@ build
 env
 .idea/
 .vscode/
-stlink-a.cfg
-stlink-b.cfg
