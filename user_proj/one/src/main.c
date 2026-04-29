@@ -14,7 +14,7 @@
 void thread_entry() {
   tag_t t = 16;
 
-  char *msg = "nayeon pop pop!";
+  char *msg = "nayeon pop pop! 1 2 3 4 5 6 7, you make me feel like eleven! baby, i'm just trying to play it cool";
   uint16_t len = strlen(msg);
   tinimpi_send(NODE_TWO, t, (uint8_t*)msg, len);
   printf("haha! i will be entering sleep for 5 seconds!\n");

@@ -17,10 +17,10 @@
 
 // blocking: send data, wait for response
 void tinimpi_send(rank_t dest, tag_t tag, uint8_t *buf, uint16_t len) {
-  uint8_t header_data[] = { tag };
+  uint8_t header_data[] = { tag, (len >> 8) & 0xFF, len & 0xFF };
   // send SYN
   MPI_DEBUG("sending SYN to rank %d,tag=%d\n", dest, tag);
-  send_packet(dest, header_data, 1, SYN, 0);
+  send_packet(dest, header_data, 3, SYN, 0);
   packet_t p;
   // wait for ACK
   MPI_DEBUG("waiting for ACK from %d...\n", dest);
@@ -48,16 +48,21 @@ void tinimpi_send(rank_t dest, tag_t tag, uint8_t *buf, uint16_t len) {
 void tinimpi_recv(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, uint16_t *out_len) {
   packet_t p;
 
+  uint16_t expected_len = 0;
+
   // wait for src to initiate
   MPI_DEBUG("waiting for SYN from %d...\n", src);
   while (1) {
     p = get_packet();
     if (p.src == src && p.opcode == SYN && p.payload[0] == tag) {
+      expected_len += p.payload[1] << 8;
+      expected_len += p.payload[2];
       MPI_DEBUG("recieved SYN from %d!\n", src);
       MPI_DEBUG("--> tag is [%d](%c)\n", tag, (char)(tag+'0'));
       break;
     }
   }
+  MPI_DEBUG("expecting data length of %d...", expected_len);
 
   // send ACK
   MPI_DEBUG("sending ACK to rank %d...\n", src);
@@ -72,8 +77,8 @@ void tinimpi_recv(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, ui
       MPI_DEBUG("recieved data from %d of length %d!\n", src, p.len);
       *out_len += p.len;
       memcpy(buf + (p.seq * _NETWORK_MAX_PAYLOAD_SIZE), p.payload, p.len);
-      MPI_DEBUG("p.seq(%d) == (%d)\n", p.seq, (buf_capacity / _NETWORK_MAX_PAYLOAD_SIZE));
-      if (p.seq == (buf_capacity / _NETWORK_MAX_PAYLOAD_SIZE)) {
+      MPI_DEBUG("p.seq(%d) == (%d)\n", p.seq, (expected_len / _NETWORK_MAX_PAYLOAD_SIZE));
+      if (p.seq == (expected_len / _NETWORK_MAX_PAYLOAD_SIZE)) {
         break;
       }
     }

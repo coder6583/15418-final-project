@@ -13,9 +13,9 @@
 void thread_entry() {
  tag_t t = 16;
 
-  char buf[32];
+  char buf[128];
   uint16_t out_len;
-  tinimpi_recv(NODE_ONE, t, (uint8_t*) buf, 32, &out_len);
+  tinimpi_recv(NODE_ONE, t, (uint8_t*) buf, 128, &out_len);
   printf("Recieved message over tiniMPI: %s\n", buf); 
   printf("Entering barrier....\n");
   tinimpi_barrier();
