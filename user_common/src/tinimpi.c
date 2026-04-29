@@ -12,9 +12,28 @@
 
 static recv_req_t pending;
 
+/* Auto-ACK'd SYNs that arrived before tinimpi_recv2 was called */
+typedef struct {
+    rank_t src;
+    tag_t tag;
+    uint16_t expected_len;
+} buffered_syn_t;
+
+#define SYN_QUEUE_SIZE 4
+static buffered_syn_t syn_queue[SYN_QUEUE_SIZE];
+static volatile uint8_t syn_head = 0;
+static volatile uint8_t syn_tail = 0;
+
+/* General buffer for unexpected ACK/DATA packets */
+#define PKTBUF_SIZE 4
+static int pktbuf_valid[PKTBUF_SIZE];
+static packet_t pktbuf[PKTBUF_SIZE];
+
 void tinimpi_init(rank_t *rank, void (*idle_func)()) {
-  pending.active = 0;
-  pending.done   = 0;
+  pending.active     = 0;
+  pending.done       = 0;
+  syn_head = syn_tail = 0;
+  for (int i = 0; i < PKTBUF_SIZE; i++) pktbuf_valid[i] = 0;
   *rank = get_rank();
   printf("rank %d\n", *rank);
   net_init(*rank);
@@ -24,6 +43,19 @@ void tinimpi_init(rank_t *rank, void (*idle_func)()) {
 }
 
 static packet_t wait_for(rank_t src, uint8_t opcode, tag_t tag) {
+    /* check unexpected buffer before blocking */
+    for (int i = 0; i < PKTBUF_SIZE; i++) {
+        if (!pktbuf_valid[i]) continue;
+        packet_t *p = &pktbuf[i];
+        int src_match = (src == BROADCAST) || (src == p->src);
+        int op_match  = (opcode == p->opcode);
+        int tag_match = (opcode != SYN) || (tag == p->payload[0]);
+        if (src_match && op_match && tag_match) {
+            pktbuf_valid[i] = 0;
+            return *p;
+        }
+    }
+    /* not buffered — block until tinimpi_thread delivers it */
     pending.src    = src;
     pending.opcode = opcode;
     pending.tag    = tag;
@@ -169,20 +201,44 @@ void tinimpi_barrier() {
 }
 
 void tinimpi_thread() {
-    while (1) {
-        packet_t p;
-        if (handle_packet(&p) && pending.active && !pending.done) {
-            int src_match = (pending.src == BROADCAST) || (pending.src == p.src);
-            int op_match  = (pending.opcode == p.opcode);
-            int tag_match = (p.opcode != SYN) || (pending.tag == p.payload[0]);
-            if (src_match && op_match && tag_match) {
-                pending.result = p;
-                pending.done   = 1;
-            }
+  while (1) {
+    packet_t p;
+    if (handle_packet(&p)) {
+      int delivered = 0;
+      if (pending.active && !pending.done) {
+        int src_match = (pending.src == BROADCAST) || (pending.src == p.src);
+        int op_match  = (pending.opcode == p.opcode);
+        int tag_match = (p.opcode != SYN) || (pending.tag == p.payload[0]);
+        if (src_match && op_match && tag_match) {
+          pending.result = p;
+          pending.done   = 1;
+          delivered = 1;
         }
-        spi_progress_tx();
-        wait_until_next_period();
+      }
+      if (!delivered) {
+        uint8_t syn_next = (syn_head + 1) % SYN_QUEUE_SIZE;
+        if (p.opcode == SYN && syn_next != syn_tail) {
+          /* auto-ACK so the sender can proceed past its wait_for(ACK) */
+          send_packet(p.src, NULL, 0, ACK, 0);
+          syn_queue[syn_head].src = p.src;
+          syn_queue[syn_head].tag = p.payload[0];
+          syn_queue[syn_head].expected_len = ((uint16_t)p.payload[1] << 8) | p.payload[2];
+          syn_head = syn_next;
+        } else {
+          /* buffer ACK/DATA that arrived before wait_for was posted */
+          for (int i = 0; i < PKTBUF_SIZE; i++) {
+            if (!pktbuf_valid[i]) {
+              pktbuf[i]       = p;
+              pktbuf_valid[i] = 1;
+              break;
+            }
+          }
+        }
+      }
     }
+    spi_progress_tx();
+    wait_until_next_period();
+  }
 }
 
 /* ── pending-slot versions of send/recv ──────────────────────────────────── */
@@ -205,18 +261,37 @@ void tinimpi_send2(rank_t dest, tag_t tag, uint8_t *buf, uint16_t len) {
 }
 
 void tinimpi_recv2(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, uint16_t *out_len) {
-    MPI_DEBUG("waiting for SYN from %d...\n", src);
-    packet_t p = wait_for(src, SYN, tag);
-    uint16_t expected_len = ((uint16_t)p.payload[1] << 8) | p.payload[2];
-    MPI_DEBUG("received SYN from %d, expecting %d bytes\n", src, expected_len);
-
-    MPI_DEBUG("sending ACK to rank %d...\n", src);
-    send_packet(src, NULL, 0, ACK, 0);
+    uint16_t expected_len;
+    int syn_found = 0;
+    for (uint8_t i = syn_tail; i != syn_head; i = (i + 1) % SYN_QUEUE_SIZE) {
+        if (syn_queue[i].src == src && syn_queue[i].tag == tag) {
+            MPI_DEBUG("recv2: using buffered SYN from %d\n", src);
+            expected_len = syn_queue[i].expected_len;
+            /* remove this entry by shifting tail forward if it's the oldest,
+               otherwise swap with tail and advance tail */
+            if (i == syn_tail) {
+                syn_tail = (syn_tail + 1) % SYN_QUEUE_SIZE;
+            } else {
+                syn_queue[i] = syn_queue[syn_tail];
+                syn_tail = (syn_tail + 1) % SYN_QUEUE_SIZE;
+            }
+            syn_found = 1;
+            break;
+        }
+    }
+    if (!syn_found) {
+        MPI_DEBUG("waiting for SYN from %d...\n", src);
+        packet_t p = wait_for(src, SYN, tag);
+        expected_len = ((uint16_t)p.payload[1] << 8) | p.payload[2];
+        MPI_DEBUG("received SYN from %d, expecting %d bytes\n", src, expected_len);
+        MPI_DEBUG("sending ACK to rank %d...\n", src);
+        send_packet(src, NULL, 0, ACK, 0);
+    }
 
     *out_len = 0;
     uint8_t last_seq = expected_len / _NETWORK_MAX_PAYLOAD_SIZE;
     while (1) {
-        p = wait_for(src, DATA, 0);
+        packet_t p = wait_for(src, DATA, 0);
         MPI_DEBUG("received data from %d, seq=%d len=%d\n", src, p.seq, p.len);
         memcpy(buf + (p.seq * _NETWORK_MAX_PAYLOAD_SIZE), p.payload, p.len);
         *out_len += p.len;
@@ -224,5 +299,30 @@ void tinimpi_recv2(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, u
     }
 
     if (*out_len > buf_capacity) *out_len = buf_capacity;
-    buf[*out_len] = '\0';
+}
+
+void tinimpi_barrier2() {
+    addr_t me = get_addr();
+    bool checklist[TOPOLOGY];
+    for (int i = 0; i < TOPOLOGY; i++) checklist[i] = false;
+    checklist[me] = true;
+    send_packet(BROADCAST, NULL, 0, BARRIER, 0);
+
+    while (1) {
+        packet_t p = wait_for(BROADCAST, BARRIER, 0);
+        if (!checklist[p.src]) {
+            checklist[p.src] = true;
+            send_packet(BROADCAST, NULL, 0, BARRIER, 0);
+        }
+        bool done = true;
+        for (int i = 0; i < TOPOLOGY; i++) {
+            if (!checklist[i]) { done = false; break; }
+        }
+        if (done) {
+            sleep(10);
+            send_packet(BROADCAST, NULL, 0, BARRIER, 0);
+            break;
+        }
+    }
+    printf("exiting barrier\n");
 }

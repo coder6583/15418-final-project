@@ -21,6 +21,7 @@ void tinimpi_recv(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, ui
 void tinimpi_send2(rank_t dest, tag_t tag, uint8_t *buf, uint16_t len);
 void tinimpi_recv2(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, uint16_t *out_len);
 void tinimpi_barrier();
+void tinimpi_barrier2();
 
 void tinimpi_thread();
 

@@ -149,7 +149,7 @@ void sys_spi_init(uint8_t link_id) {
         spi->CR1 &= ~SPI_SSM;
         spi->CR2 |= SPI_FRF;
         spi->CR1 |= SPI_SLAVE;
-        spi->CR1 |= SPI_BR_DIV256;
+        spi->CR1 |= SPI_BR_DIV2;
         spi->CR2 |= SPI_CR2_RXDMAEN;
         spi->CR1 |= SPI_EN;
 
@@ -203,7 +203,7 @@ void sys_spi_init(uint8_t link_id) {
         gpio_init(GPIO_C, 7, MODE_INPUT, OUTPUT_PUSH_PULL, OUTPUT_SPEED_LOW, PUPD_NONE, ALT0); // READY in
 
         spi->CR1 |= SPI_DFF_8BIT;
-        spi->CR1 |= SPI_BR_DIV256;
+        spi->CR1 |= SPI_BR_DIV2;
         spi->CR1 |= SPI_CPOL_LOW;
         spi->CR1 |= SPI_CPHA_FIRST;
         spi->CR1 |= SPI_MSBFIRST;
@@ -238,7 +238,6 @@ void sys_spi_init(uint8_t link_id) {
 /* ── DMA ISR: fires when each 71-byte buffer is complete ─────────────────── */
 
 void dma1_stream3_irq_handler(void) {
-  printk("handler called\n");
   struct dma_reg_map *dma = DMA1_BASE;
   struct dma_stream_reg_map *s = DMA1_S3_BASE;
 

@@ -36,6 +36,10 @@ void computation() {
   tinimpi_recv2(get_prev_rank(), t, (uint8_t*)recv, 127, &out_len);
   recv[out_len] = '\0';
   printf("Recieved message over tiniMPI: %s\n", recv);
+  if (rank == 0) {
+    sleep(5000);
+  }
+  tinimpi_barrier2();
   
   while (1);
 }
