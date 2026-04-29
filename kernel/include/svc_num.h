@@ -71,4 +71,8 @@
 #define SVC_SPI_RX_READY   34
 #define SVC_SPI_RX_DEQUEUE 35
 
+#define SVC_SPI_TX_QUEUE_PUSH 36
+#define SVC_SPI_TX_QUEUE_FULL 37
+#define SVC_SPI_PROGRESS_TX 38
+
 #endif /* _SVC_NUM_H_ */

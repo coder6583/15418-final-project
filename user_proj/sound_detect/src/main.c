@@ -10,19 +10,6 @@
 #include <stdint.h>
 #include <topology.h>
 
-void mpi_thread() {
-  while(1) {
-    if (spi_rx_ready()) {
-      printf("received smth\n");
-      uint8_t buf[72];
-      spi_rx_dequeue(buf, 71);
-      packet_t p = build_packet(buf);
-      print_packet(p);
-    }
-    wait_until_next_period();
-  }
-}
-
 void computation() {
   tag_t t = 16;
 
@@ -38,7 +25,7 @@ void computation() {
 int main(UNUSED int argc, UNUSED char const *argv[]) {
   net_init(NODE_ONE);
   thread_init(1, 256, &computation, 0);
-  thread_create(&mpi_thread, 0, 1, 1, NULL);
+  thread_create(&tinimpi_thread, 0, 1, 1, NULL);
   scheduler_start(1000); // just the default thread;
   while(1);
 }

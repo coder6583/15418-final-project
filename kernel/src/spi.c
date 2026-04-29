@@ -118,6 +118,16 @@ static uint8_t pkt_queue[SPI_PKT_QUEUE_DEPTH][SPI_PACKET_SIZE];
 static volatile uint8_t pkt_head = 0;  /* ISR write pointer  */
 static volatile uint8_t pkt_tail = 0;  /* consumer read pointer */
 
+/* ── DMA TX packet queue ────────────────────────────────────────────────────── */
+
+#define TXQ_SIZE 8
+
+static volatile uint32_t tx_head = 0;
+static volatile uint32_t tx_tail = 0;
+static tx_item_t tx_queue[TXQ_SIZE];
+
+static volatile spi_tx_state_t spi_tx_state = SPI_TX_IDLE;
+
 /* ── init ─────────────────────────────────────────────────────────────────── */
 
 void sys_spi_init(uint8_t link_id) {
@@ -284,28 +294,113 @@ void sys_spi_receive(uint8_t *rx_data, uint32_t len) {
 }
 
 void sys_spi_transmit(uint8_t *tx_data, uint32_t len) {
+  while(sys_spi_tx_queue_full());
+  sys_spi_tx_queue_push(tx_data, len);
+  // struct spi_reg_map *spi = SPI3_BASE;
+  // struct dma_stream_reg_map *s = DMA1_S5_BASE;
+
+  // gpio_clr(GPIO_A, 10);
+  // // while (gpio_read(GPIO_C, 7) == 1);
+  // BULLSHIT
+
+  // DMA1_BASE->HIFCR = DMA_HIFCR_CTCIF5;
+  // s->M0AR = (uint32_t)tx_data;
+  // s->NDTR = len;
+  // spi->CR2 |= SPI_CR2_TXDMAEN;
+  // s->CR |= DMA_CR_EN;
+
+  // while (!(DMA1_BASE->HISR & DMA_HISR_TCIF5));
+  // DMA1_BASE->HIFCR = DMA_HIFCR_CTCIF5;
+
+  // s->CR &= ~DMA_CR_EN;
+  // spi->CR2 &= ~SPI_CR2_TXDMAEN;
+
+  // while (spi->SR & SPI_SR_BSY);
+
+  // gpio_set(GPIO_A, 10);
+}
+
+int sys_spi_tx_queue_full(void) {
+  uint32_t next = (tx_head + 1) % TXQ_SIZE;
+
+  return next == tx_tail;
+}
+
+int sys_spi_tx_queue_push(uint8_t *data, uint32_t len) {
+  if (len != SPI_PACKET_SIZE) {
+    return -1;
+  }
+
+  uint32_t next = (tx_head + 1) % TXQ_SIZE;
+
+  if (next == tx_tail) {
+    return -2; // queue full
+  }
+
+  for (uint32_t i = 0; i < len; i++) {
+    tx_queue[tx_head].data[i] = data[i];
+  }
+  tx_queue[tx_head].len = len;
+
+  tx_head = next;
+  return 0;
+}
+
+static void spi_start_tx_dma(uint8_t *data, uint32_t len) {
   struct spi_reg_map *spi = SPI3_BASE;
   struct dma_stream_reg_map *s = DMA1_S5_BASE;
 
-  gpio_clr(GPIO_A, 10);
-  // while (gpio_read(GPIO_C, 7) == 1);
-  BULLSHIT
+  gpio_clr(GPIO_A, 10); // CS low
+
+  s->CR &= ~DMA_CR_EN;
+  while (s->CR & DMA_CR_EN); // okay, short hardware wait
 
   DMA1_BASE->HIFCR = DMA_HIFCR_CTCIF5;
-  s->M0AR = (uint32_t)tx_data;
+
+  s->M0AR = (uint32_t)data;
   s->NDTR = len;
+
   spi->CR2 |= SPI_CR2_TXDMAEN;
   s->CR |= DMA_CR_EN;
 
-  while (!(DMA1_BASE->HISR & DMA_HISR_TCIF5));
-  DMA1_BASE->HIFCR = DMA_HIFCR_CTCIF5;
-
-  s->CR &= ~DMA_CR_EN;
-  spi->CR2 &= ~SPI_CR2_TXDMAEN;
-
-  while (spi->SR & SPI_SR_BSY);
-
-  gpio_set(GPIO_A, 10);
+  spi_tx_state = SPI_TX_DMA_ACTIVE;
 }
 
+void sys_spi_progress_tx(void) {
+  struct spi_reg_map *spi = SPI3_BASE;
+  struct dma_stream_reg_map *s = DMA1_S5_BASE;
 
+  switch (spi_tx_state) {
+  case SPI_TX_IDLE:
+    if (tx_tail == tx_head) {
+      return; // queue empty
+    }
+
+    spi_start_tx_dma(tx_queue[tx_tail].data, tx_queue[tx_tail].len);
+    return;
+
+  case SPI_TX_DMA_ACTIVE:
+    if (!(DMA1_BASE->HISR & DMA_HISR_TCIF5)) {
+      return; // DMA still feeding SPI
+    }
+
+    DMA1_BASE->HIFCR = DMA_HIFCR_CTCIF5;
+
+    s->CR &= ~DMA_CR_EN;
+    spi->CR2 &= ~SPI_CR2_TXDMAEN;
+
+    spi_tx_state = SPI_TX_WAIT_BSY;
+    return;
+
+  case SPI_TX_WAIT_BSY:
+    if (spi->SR & SPI_SR_BSY) {
+      return; // last byte still shifting out
+    }
+
+    gpio_set(GPIO_A, 10); // CS high
+
+    tx_tail = (tx_tail + 1) % TXQ_SIZE;
+    spi_tx_state = SPI_TX_IDLE;
+    return;
+  }
+}

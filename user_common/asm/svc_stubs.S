@@ -177,3 +177,18 @@ spi_rx_ready:
 spi_rx_dequeue:
   svc #SVC_SPI_RX_DEQUEUE
   bx lr
+
+.global spi_tx_queue_push
+spi_tx_queue_push:
+  svc #SVC_SPI_TX_QUEUE_PUSH
+  bx lr
+
+.global spi_tx_queue_full
+spi_tx_queue_full:
+  svc #SVC_SPI_TX_QUEUE_FULL
+  bx lr
+
+.global spi_progress_tx
+spi_progress_tx:
+  svc #SVC_SPI_PROGRESS_TX
+  bx lr

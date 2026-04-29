@@ -6,6 +6,12 @@
 #include <topology.h>
 #include <stdbool.h>
 #include <sleep.h>
+#include <349_lib.h>
+#include <349_peripheral.h>
+#include <349_threads.h>
+
+#define MAX_PENDING 4
+static volatile recv_req_t pending[MAX_PENDING];
 
 #define DEBUG_MPI 1
 
@@ -138,5 +144,21 @@ void tinimpi_barrier() {
       send_packet(BROADCAST, NULL, 0, BARRIER, 0);
       break;
     }
+  }
+}
+
+void tinimpi_thread() {
+  while(1) {
+    if (spi_rx_ready()) {
+      printf("received smth\n");
+      uint8_t buf[72];
+      spi_rx_dequeue(buf, 71);
+      packet_t p = build_packet(buf);
+      print_packet(p);
+      
+      // if (p.src == src && p.opcode == SYN && p.payload[0])
+    }
+    spi_progress_tx();
+    wait_until_next_period();
   }
 }

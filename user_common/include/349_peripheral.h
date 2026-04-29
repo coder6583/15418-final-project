@@ -52,5 +52,9 @@ void lcd_set_cursor(uint8_t row, uint8_t col);
 int spi_rx_ready();
 int spi_rx_dequeue(uint8_t *buf, uint32_t len);
 
+int spi_tx_queue_full();
+int spi_tx_queue_push(uint8_t *buf, uint32_t len);
+void spi_progress_tx();
+
 
 #endif /* _349_PERIPHERAL_H */

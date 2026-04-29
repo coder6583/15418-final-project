@@ -107,6 +107,15 @@ void svc_c_handler(uint32_t *svc_addr, uint32_t *stack_frame ) {
     case SVC_SPI_RX_DEQUEUE:
         r = (uint32_t)sys_spi_rx_dequeue((void*)r0, (uint32_t)r1);
         break;
+    case SVC_SPI_PROGRESS_TX:
+        sys_spi_progress_tx();
+        return;
+    case SVC_SPI_TX_QUEUE_FULL:
+        r = (uint32_t)sys_spi_tx_queue_full();
+        break;
+    case SVC_SPI_TX_QUEUE_PUSH:
+        r = (uint32_t)sys_spi_tx_queue_push((void*)r0, (uint32_t)r1);
+        break;
     case SVC_MUT_INIT:
         r = (uint32_t)sys_mutex_init(r0);
         break;
