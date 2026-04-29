@@ -121,6 +121,7 @@ void tinimpi_barrier() {
     // wait for other nodes to broadcast themselves
     if (p.dest == BROADCAST && p.opcode == BARRIER && !checklist[p.src]) {
       checklist[p.src] = true;
+      print_checklist(checklist, TOPOLOGY);
       send_packet(BROADCAST, NULL, 0, BARRIER, 0);
     }
 
@@ -133,7 +134,6 @@ void tinimpi_barrier() {
       }
     }
     if (done) {
- //     print_checklist(checklist, TOPOLOGY);
       sleep(10);
       send_packet(BROADCAST, NULL, 0, BARRIER, 0);
       break;

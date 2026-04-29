@@ -15,4 +15,7 @@ void sys_spi_transmit(uint8_t *tx_data, uint32_t len);
 
 void sys_spi_receive(uint8_t *rx_data, uint32_t len);
 
+void spi2_irq_handler(void);
+void spi3_irq_handler(void);
+
 #endif /* _SPI_H_ */
