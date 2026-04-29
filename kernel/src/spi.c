@@ -174,9 +174,9 @@ void sys_spi_transmit(uint8_t *tx_data, uint32_t len) {
 
   // Chip select
 //  __asm("bkpt");
-  // ready is inverted signal, wait until it is asserted
   gpio_clr(GPIO_A, 10);
-  while (gpio_read(GPIO_A, 9) == 1);
+// ready is inverted signal, wait until it is asserted
+  // while (gpio_read(GPIO_A, 9) == 1);
   BULLSHIT
   // Make sure there's nothing transmitting currently
   while (!(spi -> SR & SPI_SR_TXE));
@@ -216,9 +216,9 @@ void sys_spi_receive(uint8_t *rx_data, uint32_t len) {
     rx_data[i] = *((volatile uint8_t *)&spi->DR);
   }
 
-  gpio_set(GPIO_B, 13);
   while (gpio_read(GPIO_B, 12) == 0);
   // deasert READY
+  gpio_set(GPIO_B, 13);
 
   return;
 }

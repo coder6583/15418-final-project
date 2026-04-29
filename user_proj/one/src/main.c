@@ -26,9 +26,9 @@ void thread_entry() {
 }
 
 int main(UNUSED int argc, UNUSED char const *argv[]) {
-   net_init(NODE_ONE);
-   thread_init(1, 256, NULL, 0);
-   thread_create(&thread_entry, 0, 1, 1, NULL);
-   scheduler_start(1000); // just the default thread;
-   while(1);
+  net_init(NODE_ONE);
+  thread_init(1, 256, NULL, 0);
+  thread_create(&thread_entry, 0, 1, 1, NULL);
+  scheduler_start(1000); // just the default thread;
+  while(1);
 }

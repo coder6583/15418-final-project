@@ -20,7 +20,7 @@ void tinimpi_send(rank_t dest, tag_t tag, uint8_t *buf, uint16_t len) {
   uint8_t header_data[] = { tag };
   // send SYN
   MPI_DEBUG("sending SYN to rank %d,tag=%d\n", dest, tag);
-  send_packet(dest, header_data, 1, SYN);
+  send_packet(dest, header_data, 1, SYN, 0);
   packet_t p;
   // wait for ACK
   MPI_DEBUG("waiting for ACK from %d...\n", dest);
@@ -34,7 +34,14 @@ void tinimpi_send(rank_t dest, tag_t tag, uint8_t *buf, uint16_t len) {
   }
   // now, send data
   MPI_DEBUG("Sending data to %d!\n", dest);
-  send_packet(dest, buf, len, DATA);
+
+  for (uint16_t offset = 0; offset < len; offset += _NETWORK_MAX_PAYLOAD_SIZE) {
+    uint16_t payload_len = len - offset;
+    if (payload_len > _NETWORK_MAX_PAYLOAD_SIZE) {
+      payload_len = _NETWORK_MAX_PAYLOAD_SIZE;
+    }
+    send_packet(dest, buf + offset, payload_len, DATA, offset / _NETWORK_MAX_PAYLOAD_SIZE);
+  }
 }
 
 // blocking: wait for response
@@ -54,24 +61,29 @@ void tinimpi_recv(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, ui
 
   // send ACK
   MPI_DEBUG("sending ACK to rank %d...\n", src);
-  send_packet(src, NULL, 0, ACK);
+  send_packet(src, NULL, 0, ACK, 0);
+
+  *out_len = 0;
 
   // wait for src to send data
   while (1) {
     p = get_packet();
     if (p.src == src && p.opcode == DATA) {
-      MPI_DEBUG("recieved data from %d!\n", src);
-      break;
+      MPI_DEBUG("recieved data from %d of length %d!\n", src, p.len);
+      *out_len += p.len;
+      memcpy(buf + (p.seq * _NETWORK_MAX_PAYLOAD_SIZE), p.payload, p.len);
+      MPI_DEBUG("p.seq(%d) == (%d)\n", p.seq, (buf_capacity / _NETWORK_MAX_PAYLOAD_SIZE));
+      if (p.seq == (buf_capacity / _NETWORK_MAX_PAYLOAD_SIZE)) {
+        break;
+      }
     }
   }
   
-  // place result in buffer
-  if (p.len > buf_capacity) 
+  // // place result in buffer
+  if (*out_len > buf_capacity) 
     *out_len = buf_capacity;
-  else
-    *out_len = p.len;
 
-  memcpy(buf, p.payload, *out_len);
+  // memcpy(buf, p.payload, *out_len);
   buf[*out_len] = '\0';
 }
 
@@ -97,14 +109,14 @@ void tinimpi_barrier() {
   checklist[me] = true;
 
   // if we are not the first to reach the barrier, don't wait and send right away.
-  send_packet(BROADCAST, NULL, 0, BARRIER);
+  send_packet(BROADCAST, NULL, 0, BARRIER, 0);
 
   while (1) {
     packet_t p = get_packet();
     // wait for other nodes to broadcast themselves
     if (p.dest == BROADCAST && p.opcode == BARRIER && !checklist[p.src]) {
       checklist[p.src] = true;
-      send_packet(BROADCAST, NULL, 0, BARRIER);
+      send_packet(BROADCAST, NULL, 0, BARRIER, 0);
     }
 
     // check if everyone has responded
@@ -118,7 +130,7 @@ void tinimpi_barrier() {
     if (done) {
  //     print_checklist(checklist, TOPOLOGY);
       sleep(10);
-      send_packet(BROADCAST, NULL, 0, BARRIER);
+      send_packet(BROADCAST, NULL, 0, BARRIER, 0);
       break;
     }
   }
