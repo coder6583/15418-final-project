@@ -11,12 +11,12 @@
 #define _SYSCALL_THREAD_H_
 
 #include <unistd.h>
-
+#include "syscall_mutex.h"
 
 /**
  * @brief      The PendSV interrupt handler.
  */
-void *pendsv_c_handler( void *, void * );
+void *pendsv_c_handler( void *, void *);
 
 /**
  * @brief      Initialize the thread library
@@ -165,6 +165,9 @@ typedef struct {
 	uint64_t time; // how long has the thread been alive for 
 	uint64_t running_time; // how long has the thread been running
 	uint64_t period_time; // how long has the thread been alive for in the current period
+	uint32_t mutexes; // mutexes the thread locked
+	kmutex_t *waiting_for; // mutex the thread could be waiting for
+	uint32_t dynamic_priority;
 } tcb_t;
 
 tcb_t *get_current_tcb();

@@ -99,8 +99,23 @@ void svc_c_handler(uint32_t *svc_addr, uint32_t *stack_frame ) {
         sys_spi_receive((void*)r0, (uint32_t)r1);
         return;
     case SVC_SLEEP:
-	systick_delay(r0);
-	return;
+        systick_delay(r0);
+        return;
+    case SVC_SPI_RX_READY:
+        r = (uint32_t)sys_spi_rx_ready();
+        break;
+    case SVC_SPI_RX_DEQUEUE:
+        r = (uint32_t)sys_spi_rx_dequeue((void*)r0, (uint32_t)r1);
+        break;
+    case SVC_MUT_INIT:
+        r = (uint32_t)sys_mutex_init(r0);
+        break;
+    case SVC_MUT_LOK:
+        sys_mutex_lock((void*)r0);
+        return;
+    case SVC_MUT_ULK:
+        sys_mutex_unlock((void*)r0);
+        return;
     default:
         return;
     }

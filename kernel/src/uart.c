@@ -137,7 +137,14 @@ void uart_irq_rx_handler() {
 
 // flush uart
 void uart_flush(){
-    return;
+    struct uart_reg_map *uart = UART2_BASE;
+    int state = save_interrupt_state_and_disable();
+    while (!txbuf_empty()) {
+    	while(((uart->SR >> UART_STATUS_DATA_EMPTY) & 1) == 0);
+        char c = txbuf_rem();
+        uart->DR = c;
+    }
+    restore_interrupt_state(state);
 }
 // uart irq handler
 void uart_irq_handler(){

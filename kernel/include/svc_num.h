@@ -68,4 +68,7 @@
 
 #define SVC_SLEEP 33
 
+#define SVC_SPI_RX_READY   34
+#define SVC_SPI_RX_DEQUEUE 35
+
 #endif /* _SVC_NUM_H_ */

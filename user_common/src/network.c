@@ -27,8 +27,8 @@ packet_t get_packet() {
     spi_receive(buf, _NETWORK_MAX_PACKET_SIZE);
     p.__start = buf[0];
     p.src = buf[1];
-    p.dest = buf[2];
     p.ttl = buf[3];
+    p.dest = buf[2];
     p.len = buf[4];
     p.opcode = buf[5];
     p.seq = buf[6];

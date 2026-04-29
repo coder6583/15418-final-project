@@ -43,7 +43,7 @@ ivt:
 .word   spin                /* 27 IRQ11 DMA1_Channel1   */
 .word   spin                /* 28 IRQ12 DMA1_Channel2   */
 .word   spin                /* 29 IRQ13 DMA1_Channel3 */
-.word   spin                /* 30 IRQ14 DMA1_Channel4 */
+.word   dma1_stream3_irq_handler /* 30 IRQ14 DMA1_Stream3 */
 .word   spin                /* 31 IRQ15 DMA1_Channel5   */
 .word   spin                /* 32 IRQ16 DMA1_Channel6   */
 .word   spin                /* 33 IRQ17 DMA1_Channel7 */

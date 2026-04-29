@@ -27,6 +27,8 @@
 #define USER_STACK 0
 #define KERNEL_STACK 1
 
+#define NOT_LOCKED 255
+
 /**
  * @brief      Heap high and low pointers.
  */
@@ -83,28 +85,50 @@ typedef struct {
 
 uint8_t num_threads_created;
 uint8_t num_threads_max;
+uint8_t num_mutexes_created;
 tcb_t tcb_list[16];
 tcb_t* current_tcb;
 void* tcb_idle_fn;
 uint32_t thread_stack_size;
 int is_schedulable();
+kmutex_t mutex_list[32];
 
 extern void thread_kill();
 
+// Uses RMS scheduling and IPCP to get next thread to context switch to 
 tcb_t *get_next_tcb() {
-    if (num_threads_created == 0) return &tcb_list[15];
+    if (current_tcb -> waiting_for != NULL) {
+        return &tcb_list[current_tcb->waiting_for->locked_by];
+    }
+
+    tcb_t *best = NULL;
     for (int i = 0; i < 16; i++) {
-        if (tcb_list[i].enabled && tcb_list[i].status == RUNNABLE) {
-            return &tcb_list[i];
+        if (tcb_list[i].status != RUNNABLE) continue;
+        if (best == NULL || (tcb_list[i].dynamic_priority <= best->dynamic_priority)) {
+            if (tcb_list[i].dynamic_priority == best -> dynamic_priority) {
+            if (best -> dynamic_priority == best -> priority) {
+                best = &tcb_list[i];
+        }
+        }
+            if (tcb_list[i].waiting_for == NULL) {
+                best = &tcb_list[i];
         }
     }
-    return &tcb_list[14];
+    }
+    if (best == NULL)
+        return &tcb_list[14];
+    if (best -> waiting_for != NULL) {
+        return &tcb_list[best -> waiting_for -> locked_by];
+    }
+    return best;
 }
 
+// default idle thread
 void default_idle_thread() {
     while(1) wait_for_interrupt();
 }
 
+// wrap the actual thread so that we can call thread_kill
 void thread_wrapper(void *t(void* args0), void *args0) {
     t(args0);
     thread_kill();
@@ -139,6 +163,7 @@ int sys_thread_init(
     (void) max_mutexes;
     num_threads_max = max_threads;	
     num_threads_created = 0;
+    num_mutexes_created = 0;
     if (idle_fn == NULL) idle_fn = &default_idle_thread;
     tcb_idle_fn = idle_fn;
     if (max_threads > 14) {
@@ -186,6 +211,7 @@ int sys_thread_create(
     tcb_t *tcb = &(tcb_list[prio]);
     
     tcb -> priority = prio;
+    tcb -> dynamic_priority = prio;
     tcb -> user_stack = (void*)(&__thread_u_stacks_top - prio * thread_stack_size * 4);
     tcb -> kernel_stack = (void*)(&__thread_k_stacks_top - prio * thread_stack_size * 4);	
     tcb -> T = T;
@@ -194,7 +220,7 @@ int sys_thread_create(
     tcb -> enabled = 1;
     tcb -> used_stack = USER_STACK;
     tcb -> time = 0;
-
+    tcb -> waiting_for = NULL;
     if (is_schedulable() == -1) {
         tcb->enabled = 0;
         num_threads_created--;
@@ -229,10 +255,13 @@ int sys_thread_create(
     return 0;
 }
 
+// get the current tcb
 tcb_t *get_current_tcb() {
     return current_tcb;
 }
 
+
+// get tcb at index i of the tcb bool
 tcb_t *get_tcb_at(uint8_t i) {
     return &tcb_list[i];
 }
@@ -254,6 +283,7 @@ int is_schedulable() {
     
 }
 
+// start the scheduler
 int sys_scheduler_start( uint32_t frequency ){
     if (is_schedulable() == 0) {
         systick_init(frequency);
@@ -263,18 +293,23 @@ int sys_scheduler_start( uint32_t frequency ){
     return -1;
 }
 
+// get prio of the active thread
 uint32_t sys_get_priority(){
-    return current_tcb->priority;
+    return current_tcb->dynamic_priority;
 }
 
+
+// get time
 uint32_t sys_get_time(){
     return systick_get_ticks();
 }
 
+// get thread time
 uint32_t sys_thread_time() {
     return current_tcb->time;
 }
 
+// kill the current thread
 void sys_thread_kill() {
     num_threads_created--;
     // Not idle and not default
@@ -306,21 +341,93 @@ void sys_thread_kill() {
     }
 }
 
+// wait until next period
 void sys_wait_until_next_period() {
     if (current_tcb->priority == 14) return;
     current_tcb->status = WAITING;
     pend_pendsv();
 }
 
+
+// init the mutex
 kmutex_t *sys_mutex_init( uint32_t max_prio ) {
-    (void) max_prio;
-    return NULL;
+    if (num_mutexes_created >= 32) {
+        printk("ERROR: Too many mutexes created.\n");
+        return NULL;
+    }
+    kmutex_t *result = &mutex_list[num_mutexes_created];
+    result -> locked_by = NOT_LOCKED;
+    result -> prio_ceil = max_prio;
+    result -> index = num_mutexes_created;
+    num_mutexes_created += 1;
+    return result;
 }
 
+
+// lock the mutex
 void sys_mutex_lock( kmutex_t *mutex ) {
-    (void) mutex;
+    int state = save_interrupt_state_and_disable();
+    if (mutex -> locked_by == current_tcb -> priority) {
+        printk("WARNING: tried to acquire a locked mutex.\n");
+        restore_interrupt_state(state);
+        return;
+    }
+    if (mutex -> prio_ceil > current_tcb -> priority) {
+        printk("WARNING: violated priority ceiling.\n");
+        restore_interrupt_state(state);
+        sys_thread_kill();
+    }
+    if (mutex -> locked_by != NOT_LOCKED) {
+        current_tcb -> waiting_for = mutex;
+        while(mutex -> locked_by != NOT_LOCKED) {
+            current_tcb -> status = RUNNABLE;
+            restore_interrupt_state(state);
+            pend_pendsv();
+            state = save_interrupt_state_and_disable();
+        }
+        current_tcb -> waiting_for = NULL;
+    }
+    current_tcb -> mutexes |= (1 << mutex -> index);
+    if (current_tcb -> dynamic_priority > mutex -> prio_ceil) {
+        current_tcb -> dynamic_priority = mutex -> prio_ceil;
+    }
+    mutex -> locked_by = current_tcb -> priority;
+    restore_interrupt_state(state);
+    return;
 }
 
+
+// unlock the mutex
 void sys_mutex_unlock( kmutex_t *mutex ) {
-    (void) mutex;
+    int state = save_interrupt_state_and_disable();
+    if (mutex -> locked_by == NOT_LOCKED) {
+        printk("WARNING: tried to release an unlocked mutex.\n");
+        restore_interrupt_state(state);
+        return;
+    }
+    current_tcb -> dynamic_priority = current_tcb -> priority;
+    uint32_t mutex_mask = ~(1 << mutex -> index);
+    current_tcb -> mutexes &= mutex_mask;
+    if (current_tcb -> mutexes != 0) {
+        uint32_t highest = current_tcb -> dynamic_priority;
+        for (uint8_t i = 0; i < 32; i++) {
+            if ((current_tcb -> mutexes >> i) & 0x1) {
+                if (highest > mutex_list[i].prio_ceil) {
+                    highest = mutex_list[i].prio_ceil;
+                }
+            }
+        }
+        current_tcb -> dynamic_priority = highest;
+    }
+    for (uint8_t i = 0; i < current_tcb -> priority; i++) {
+        if (tcb_list[i].status == RUNNABLE) {
+            mutex -> locked_by = NOT_LOCKED;
+            restore_interrupt_state(state);
+            current_tcb -> status = RUNNABLE;
+            pend_pendsv();
+            break;
+        }
+    }
+    mutex -> locked_by = NOT_LOCKED;
+    restore_interrupt_state(state);
 }
