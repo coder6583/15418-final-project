@@ -4,6 +4,7 @@
 #include <gpio.h>
 #include <nvic.h>
 #include <arm.h>
+#include <printk.h>
 
 #define BULLSHIT for(int i = 0; i < 100000; i++);
 
@@ -37,6 +38,7 @@ struct spi_reg_map {
 #define SPI_FRF          (0 << 4)
 #define SPI_EN           (1 << 6)
 #define SPI_CR2_RXDMAEN  (1 << 0)
+#define SPI_CR2_TXDMAEN  (1 << 1)
 
 #define RCC_SPI2_CLOCK_EN (1 << 14)
 #define RCC_SPI3_CLOCK_EN (1 << 15)
@@ -66,11 +68,14 @@ struct dma_stream_reg_map {
 #define DMA1_BASE    ((struct dma_reg_map *)    0x40026000)
 /* Stream3 base = DMA1 base + 0x58 */
 #define DMA1_S3_BASE ((struct dma_stream_reg_map *) 0x40026058)
+/* Stream5 base = DMA1 base + 0x88 */
+#define DMA1_S5_BASE ((struct dma_stream_reg_map *) 0x40026088)
 
 /* SxCR bits */
 #define DMA_CR_EN        (1 << 0)
 #define DMA_CR_TCIE      (1 << 4)
 #define DMA_CR_DIR_P2M   (0 << 6)
+#define DMA_CR_DIR_M2P   (1 << 6)
 #define DMA_CR_CIRC      (1 << 8)
 #define DMA_CR_MINC      (1 << 10)
 #define DMA_CR_PSIZE_BYTE (0 << 11)
@@ -83,6 +88,10 @@ struct dma_stream_reg_map {
 /* LISR/LIFCR Stream3 flags (bits 22–27) */
 #define DMA_LISR_TCIF3   (1 << 27)
 #define DMA_LIFCR_CTCIF3 (1 << 27)
+
+/* HISR/HIFCR Stream5 flags (bits 6–11) */
+#define DMA_HISR_TCIF5   (1 << 11)
+#define DMA_HIFCR_CTCIF5 (1 << 11)
 
 #define RCC_AHB1_DMA1_EN (1 << 21)
 
@@ -184,41 +193,62 @@ void sys_spi_init(uint8_t link_id) {
         spi->CR2 |= SPI_FRF;
         spi->CR1 |= SPI_MASTER;
         spi->CR1 |= SPI_EN;
+
+        /* ── DMA1 Stream5 (SPI3_TX, channel 0) ── */
+        rcc->ahb1_enr |= RCC_AHB1_DMA1_EN;
+
+        struct dma_stream_reg_map *s = DMA1_S5_BASE;
+
+        s->CR &= ~DMA_CR_EN;
+        while (s->CR & DMA_CR_EN);
+
+        DMA1_BASE->HIFCR = DMA_HIFCR_CTCIF5;
+
+        s->PAR  = (uint32_t)&spi->DR;  /* destination: SPI3 data register */
+        s->FCR  = 0;                   /* direct mode */
+
+        s->CR = DMA_CR_CHSEL0
+              | DMA_CR_PL_HIGH
+              | DMA_CR_MSIZE_BYTE
+              | DMA_CR_PSIZE_BYTE
+              | DMA_CR_MINC
+              | DMA_CR_DIR_M2P;        /* memory → peripheral, single shot */
     }
 }
 
 /* ── DMA ISR: fires when each 71-byte buffer is complete ─────────────────── */
 
 void dma1_stream3_irq_handler(void) {
-    struct dma_reg_map *dma = DMA1_BASE;
-    struct dma_stream_reg_map *s = DMA1_S3_BASE;
+  printk("handler called\n");
+  struct dma_reg_map *dma = DMA1_BASE;
+  struct dma_stream_reg_map *s = DMA1_S3_BASE;
 
-    if (!(dma->LISR & DMA_LISR_TCIF3))
-        return;
+  if (!(dma->LISR & DMA_LISR_TCIF3))
+    return;
 
-    dma->LIFCR = DMA_LIFCR_CTCIF3;
+  dma->LIFCR = DMA_LIFCR_CTCIF3;
 
-    /* CT has already toggled to the next target:
-       CT=1 means DMA is now filling M1 → M0 (buf[0]) just completed
-       CT=0 means DMA is now filling M0 → M1 (buf[1]) just completed */
-    uint8_t completed = ((s->CR & DMA_CR_CT) != 0) ? 0 : 1;
+  /* CT has already toggled to the next target:
+      CT=1 means DMA is now filling M1 → M0 (buf[0]) just completed
+      CT=0 means DMA is now filling M0 → M1 (buf[1]) just completed */
+  uint8_t completed = ((s->CR & DMA_CR_CT) != 0) ? 0 : 1;
 
-    uint8_t next = (pkt_head + 1) % SPI_PKT_QUEUE_DEPTH;
-    if (next != pkt_tail) {
-        for (int i = 0; i < SPI_PACKET_SIZE; i++)
-            pkt_queue[pkt_head][i] = dma_buf[completed][i];
-        pkt_head = next;
-    }
-    /* if queue is full the packet is silently dropped */
+  uint8_t next = (pkt_head + 1) % SPI_PKT_QUEUE_DEPTH;
+  if (next != pkt_tail) {
+    for (int i = 0; i < SPI_PACKET_SIZE; i++)
+      pkt_queue[pkt_head][i] = dma_buf[completed][i];
+    pkt_head = next;
+  }
+  /* if queue is full the packet is silently dropped */
 
-    nvic_clear_pending(DMA1_STREAM3_IRQ);
+  nvic_clear_pending(DMA1_STREAM3_IRQ);
 }
 
 /* ── public API ───────────────────────────────────────────────────────────── */
 
 /* Returns 1 if at least one complete packet is waiting. */
 int sys_spi_rx_ready(void) {
-    return pkt_head != pkt_tail;
+  return pkt_head != pkt_tail;
 }
 
 /* Copies the oldest queued packet into buf (up to len bytes).
@@ -245,18 +275,28 @@ void sys_spi_receive(uint8_t *rx_data, uint32_t len) {
 }
 
 void sys_spi_transmit(uint8_t *tx_data, uint32_t len) {
-    struct spi_reg_map *spi = SPI3_BASE;
+  struct spi_reg_map *spi = SPI3_BASE;
+  struct dma_stream_reg_map *s = DMA1_S5_BASE;
 
-    gpio_clr(GPIO_A, 10);
-    // while (gpio_read(GPIO_C, 7) == 1);
-    BULLSHIT
+  gpio_clr(GPIO_A, 10);
+  // while (gpio_read(GPIO_C, 7) == 1);
+  BULLSHIT
 
-    while (!(spi->SR & SPI_SR_TXE));
-    for (uint32_t i = 0; i < len; i++) {
-        *((volatile uint8_t *)&spi->DR) = tx_data[i];
-        while (!(spi->SR & SPI_SR_TXE));
-    }
-    while (spi->SR & SPI_SR_BSY);
+  DMA1_BASE->HIFCR = DMA_HIFCR_CTCIF5;
+  s->M0AR = (uint32_t)tx_data;
+  s->NDTR = len;
+  spi->CR2 |= SPI_CR2_TXDMAEN;
+  s->CR |= DMA_CR_EN;
 
-    gpio_set(GPIO_A, 10);
+  while (!(DMA1_BASE->HISR & DMA_HISR_TCIF5));
+  DMA1_BASE->HIFCR = DMA_HIFCR_CTCIF5;
+
+  s->CR &= ~DMA_CR_EN;
+  spi->CR2 &= ~SPI_CR2_TXDMAEN;
+
+  while (spi->SR & SPI_SR_BSY);
+
+  gpio_set(GPIO_A, 10);
 }
+
+
