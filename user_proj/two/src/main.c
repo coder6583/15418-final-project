@@ -46,7 +46,7 @@ void thread_entry() {
 
   printf("calling allgather\n");
   print_vector(v, N);
-  tinimpi_allgather(v+3, v, 4);
+  tinimpi_allgather(v+4, v, 4);
   print_vector(v, N);
   while (1);
 }
