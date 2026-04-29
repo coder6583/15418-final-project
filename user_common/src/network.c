@@ -37,6 +37,8 @@ packet_t get_packet() {
 //    print_packet(p);
     if (p.dest == addr) { 
       return p;
+    } else if (p.dest == BROADCAST && p.src == addr) {
+      return p;
     } else {
       // packet is not for us, forward if possible;
       // first checked if ttl is invalid range somehow
