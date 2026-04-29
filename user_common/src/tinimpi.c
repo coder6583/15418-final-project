@@ -140,3 +140,47 @@ void tinimpi_barrier() {
     }
   }
 }
+
+/* allgather
+* assume: sendbuf has valid `chunk_size_bytes`,
+* and recvbuf has (chunk_size)*TOPOLOGY valid bytes
+* */
+void tinimpi_allgather(uint8_t *sendbuf, uint8_t *recvbuf, uint8_t chunk_size) {
+  addr_t me = get_addr();
+  bool checklist[TOPOLOGY]; 
+  // initialize it
+  for(int i = 0; i < TOPOLOGY; i++) checklist[i] = false;
+
+  // this node reached the barrier, so we automatically check ourselves
+  checklist[me] = true;
+
+  
+  send_packet(BROADCAST, sendbuf, chunk_size, BARRIER);
+
+  while (1) {
+    packet_t p = get_packet();
+
+    if (p.dest == BROADCAST && p.opcode == BARRIER 
+        && !checklist[p.src] && p.len == chunk_size) {
+      checklist[p.src] = true;
+      memcpy(recvbuf+(p.src*chunk_size), p.payload, chunk_size);
+      sleep(10);
+      send_packet(BROADCAST, sendbuf, chunk_size, BARRIER);
+    }
+
+    bool done = true;
+    for (int i = 0; i < TOPOLOGY; i++) {
+      if (!checklist[i]) {
+        done = false;
+        break;
+      }
+    }
+    if (done) {
+      sleep(10);
+      send_packet(BROADCAST, sendbuf, chunk_size, BARRIER);
+      break;
+    }
+ 
+  }
+}
+ 

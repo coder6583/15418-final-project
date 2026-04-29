@@ -9,4 +9,5 @@ void tinimpi_init();
 void tinimpi_send(rank_t dest, tag_t tag, uint8_t *buf, uint16_t len);
 void tinimpi_recv(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, uint16_t *out_len);
 void tinimpi_barrier();
+void tinimpi_allgather(uint8_t *sendbuf, uint8_t *recvbuf, uint8_t chunk_size);
 #endif

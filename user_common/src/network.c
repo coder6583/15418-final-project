@@ -42,11 +42,11 @@ packet_t get_packet() {
     } else {
       // packet is not for us, forward if possible;
       // first checked if ttl is invalid range somehow
-      if (0 < p.ttl && p.ttl <= _NETWORK_TTL_INIT) {
+      if (0 < p.ttl && p.ttl <= _NETWORK_TTL_INIT && p.src != addr) {
         buf[3]--;
         spi_transmit(buf, _NETWORK_HEADER_SIZE+p.len);
       }
-      if (p.dest == BROADCAST) {
+      if (p.dest == BROADCAST && p.src != addr) {
         return p;
       }
       // ttl = 0 means packet dropped

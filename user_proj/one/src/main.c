@@ -9,6 +9,29 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <topology.h>
+#include <matmul.h>
+
+int A[N][N] = {
+  {1, 2, 3, 4, 0, 0, 0, 0},
+  {5, 6, 7, 8, 0, 0, 0, 0},
+  {9, 10, 11, 12, 0, 0, 0, 0},
+  {13, 14, 15, 16, 0, 0, 0, 0},
+  {17, 18, 19, 20, 0, 0, 0, 0},
+  {21, 22, 23, 24, 0, 0, 0, 0},
+  {25, 26, 27, 28, 0, 0, 0, 0},
+  {29, 30, 31, 32, 0, 0, 0, 0}
+};
+
+uint8_t v[N] = {
+  -2,
+  -4,
+  -6,
+  -8,
+  0,
+  0,
+  0,
+  0
+};
 
 
 void thread_entry() {
@@ -22,6 +45,10 @@ void thread_entry() {
   printf("now, i enter barrier!\n");
   tinimpi_barrier();
   printf("Exiting barrier!\n");
+  printf("calling allgather\n");
+  print_vector(v, N);
+  tinimpi_allgather(v, v, 4);
+  print_vector(v, N);
   while (1);
 }
 
