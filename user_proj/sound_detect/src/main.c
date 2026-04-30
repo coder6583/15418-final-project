@@ -31,6 +31,13 @@ rank_t rank;
 #define DX (X_MAX - X_MIN) / (GRID_WIDTH - 1)
 #define DY (Y_MAX - Y_MIN) / (GRID_HEIGHT - 1)
 
+struct Result {
+  float error;
+  float x;
+  float y;
+  uint8_t src;
+};
+
 rank_t get_next_rank() {
   return (rank + 1) % 2;
 }
@@ -78,10 +85,8 @@ void sounddetect_ref_pair(
     if (orig_src == rank) {
       done = 1;
     } else {
-      if (rank != 0) {
-        memcpy(all_mic_data[orig_src], recv_buffer,
-               NUM_SAMPLES * sizeof(int16_t));
-      }
+      memcpy(all_mic_data[orig_src], recv_buffer,
+              NUM_SAMPLES * sizeof(int16_t));
       tinimpi_send2(next_rank, 0, (uint8_t *)recv_buffer, NUM_SAMPLES * sizeof(int16_t));
       done = 0;
     }
@@ -101,6 +106,7 @@ void sounddetect_ref_pair(
     for (int lag = -MAX_LAG; lag < MAX_LAG; lag++) {
       int64_t score = 0LL;
       for (int j = 1; j < send_size; j++) {
+        // printf("mic 0 data: %d\r\n", all_mic_data[0][j]);
         energy += (int64_t)all_mic_data[0][j] * (int64_t)all_mic_data[0][j];
         if (j + lag < 0) {
           continue;
@@ -123,7 +129,7 @@ void sounddetect_ref_pair(
       int32_t high = (int32_t)(energy >> 32);
       uint32_t low = (uint32_t)(energy & 0xFFFFFFFF);
 
-      printf("%ld%08lu\r\n", high, low);
+      printf("energy: %ld%08lu\r\n", high, low);
       // printf("energy: %lld\n", energy);
       // printf("pair (0, %d): best_lag=%d dist_diff=%f\n", i, best_lag, best_dist_diff[i]);
     }
@@ -133,7 +139,13 @@ void sounddetect_ref_pair(
   float best_error = INFINITY;
   float best_x = 0.0f;
   float best_y = 0.0f;
-  for (float x = X_MIN; x < X_MAX; x += DX) {
+  
+  int nx = GRID_WIDTH / TOPOLOGY;
+  int start_ix = rank * nx;
+  int end_ix = (rank + 1) * nx;
+
+  for (int ix = start_ix; ix < end_ix; ix ++) {
+    float x = X_MIN + ix * DX;
     for (float y = Y_MIN; y < Y_MAX; y += DY) {
       float total_error = 0.0f;
 
@@ -158,12 +170,52 @@ void sounddetect_ref_pair(
     }
   }
 
+  struct Result local_result = {
+    best_error,
+    best_x,
+    best_y,
+    rank,
+  };
+
+  struct Result all_results[2];
+
+  tinimpi_send2(next_rank, 0, (uint8_t*)&local_result, sizeof(struct Result));
+  all_results[rank] = local_result;
+  int gather_done = 0;
+  while(!gather_done) {
+    struct Result recv_buffer;
+    uint16_t out_len = 0;
+    tinimpi_recv2(prev_rank, 0, (uint8_t*)&recv_buffer, sizeof(struct Result), &out_len);
+
+    int orig_src = recv_buffer.src;
+    if (orig_src == rank) {
+      gather_done = 1;
+    } else {
+      memcpy(&all_results[orig_src], &recv_buffer, sizeof(struct Result));
+      tinimpi_send2(next_rank, 0, (uint8_t*)&recv_buffer, sizeof(struct Result));
+      gather_done = 0;
+    }
+  }
+  tinimpi_barrier2();
+
+  float global_best_error = INFINITY;
+  float global_x = 0.0f;
+  float global_y = 0.0f;
+  for (int i = 0; i < TOPOLOGY; i++) {
+    if (all_results[i].error < global_best_error) {
+      global_best_error = all_results[i].error;
+      global_x = all_results[i].x;
+      global_y = all_results[i].y;
+    }
+  }
+
   if (rank == 1) {
     if (silent) {
       printf("silent\n");
       // std::cout << "silent" << std::endl;
     } else {
-      printf("coord: (%d, %d)\n", (int)(best_x * 100), (int)(best_y * 100));
+      // printf("coord: (%d, %d)\n", (int)(best_x * 100), (int)(best_y * 100));
+      printf("coord: (%d, %d)\n", (int)(global_x * 100), (int)(global_y * 100));
       // std::cout << "mic position: " << mic_positions[1][0] << ", " << mic_positions[1][1] << std::endl;
       // std::cout << "coord: " << best_x << ", " << best_y << std::endl;
     }

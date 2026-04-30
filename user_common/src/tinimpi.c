@@ -324,5 +324,5 @@ void tinimpi_barrier2() {
             break;
         }
     }
-    printf("exiting barrier\n");
+    MPI_DEBUG("exiting barrier\n");
 }

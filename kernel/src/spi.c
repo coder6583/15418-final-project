@@ -120,7 +120,7 @@ static volatile uint8_t pkt_tail = 0;  /* consumer read pointer */
 
 /* ── DMA TX packet queue ────────────────────────────────────────────────────── */
 
-#define TXQ_SIZE 8
+#define TXQ_SIZE 64
 
 static volatile uint32_t tx_head = 0;
 static volatile uint32_t tx_tail = 0;
