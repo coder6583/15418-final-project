@@ -8,6 +8,7 @@
 #include <tinimpi.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <math.h>
 #include <topology.h>
 
 #include "data.h"
@@ -16,6 +17,19 @@ rank_t rank;
 
 #define NUM_SAMPLES 256
 #define SAMPLE_FREQ 32000
+
+#define MAX_LAG 25
+#define ENERGY_THRESHOLD 20000000000LL
+
+#define X_MIN -1.0f
+#define X_MAX 1.0f
+#define Y_MIN -1.0f
+#define Y_MAX 1.0f
+#define GRID_WIDTH 200
+#define GRID_HEIGHT 200
+
+#define DX (X_MAX - X_MIN) / (GRID_WIDTH - 1)
+#define DY (Y_MAX - Y_MIN) / (GRID_HEIGHT - 1)
 
 rank_t get_next_rank() {
   return (rank + 1) % 2;
@@ -29,6 +43,7 @@ rank_t get_prev_rank() {
 }
 
 void sounddetect_ref_pair(
+  int offset
   // int num_samples,
   // int sample_freq,
   // int nproc
@@ -44,8 +59,8 @@ void sounddetect_ref_pair(
 
   // Simplifying from 24 bits to 16 bits
   all_mic_data[rank][0] = rank;
-  for (int i = 1; i < NUM_SAMPLES; i++) {
-    all_mic_data[rank][i] = raw_data[i][rank];
+  for (int i = 1; i < NUM_SAMPLES + 1; i++) {
+    all_mic_data[rank][i] = (int16_t)(raw_data[i + offset][rank] >> 8);
   }
 
   int next_rank = get_next_rank();
@@ -75,77 +90,85 @@ void sounddetect_ref_pair(
 
   // // Find Time Lag
   // std::vector<float> best_dist_diff(nproc, 0.0f);
-  // bool silent = true;
+  float best_dist_diff[2];
+  int silent = 1;
+  uint16_t send_size = NUM_SAMPLES + 1;
 
-  // for (int i = 1; i < nproc; i++) {
-  //   int64_t energy = 0;
-  //   int best_lag = 0;
-  //   int64_t best_score = INT64_MIN;
-  //   for (int lag = -MAX_LAG; lag < MAX_LAG; lag++) {
-  //     int64_t score = 0;
-  //     for (int j = 1; j < send_size; j++) {
-  //       energy += (int64_t)all_mic_data[0][j] * (int64_t)all_mic_data[0][j];
-  //       if (j + lag < 0) {
-  //         continue;
-  //       }
-  //       if (j + lag >= send_size) {
-  //         continue;
-  //       }
-  //       score += (int64_t)all_mic_data[i][j + lag] * (int64_t)all_mic_data[0][j];
-  //     }
-  //     if (score > best_score) {
-  //       best_score = score;
-  //       best_lag = lag;
-  //     }
-  //   }
-  //   if (energy > ENERGY_THRESHOLD) {
-  //     silent = false;
-  //   }
-  //   best_dist_diff[i] = -(float)best_lag * (1.0f/sample_freq) * 343.0f;
-  //   if (rank == 1) {
-  //     // printf("energy: %ld\n", energy);
-  //     // printf("pair (0, %d): best_lag=%d dist_diff=%f\n", i, best_lag, best_dist_diff[i]);
-  //   }
-  // }
+  for (int i = 1; i < TOPOLOGY; i++) {
+    int64_t energy = 0;
+    int best_lag = 0;
+    int64_t best_score = INT64_MIN;
+    for (int lag = -MAX_LAG; lag < MAX_LAG; lag++) {
+      int64_t score = 0LL;
+      for (int j = 1; j < send_size; j++) {
+        energy += (int64_t)all_mic_data[0][j] * (int64_t)all_mic_data[0][j];
+        if (j + lag < 0) {
+          continue;
+        }
+        if (j + lag >= send_size) {
+          continue;
+        }
+        score += (int64_t)all_mic_data[i][j + lag] * (int64_t)all_mic_data[0][j];
+      }
+      if (score > best_score) {
+        best_score = score;
+        best_lag = lag;
+      }
+    }
+    if (energy > ENERGY_THRESHOLD) {
+      silent = 0;
+    }
+    best_dist_diff[i] = -(float)best_lag * (1.0f/SAMPLE_FREQ) * 343.0f;
+    if (rank == 1) {
+      int32_t high = (int32_t)(energy >> 32);
+      uint32_t low = (uint32_t)(energy & 0xFFFFFFFF);
+
+      printf("%ld%08lu\r\n", high, low);
+      // printf("energy: %lld\n", energy);
+      // printf("pair (0, %d): best_lag=%d dist_diff=%f\n", i, best_lag, best_dist_diff[i]);
+    }
+  }
 
   // // Find intersection
-  // float best_error = INFINITY;
-  // float best_x = 0.0f;
-  // float best_y = 0.0f;
-  // for (float x = X_MIN; x < X_MAX; x += DX) {
-  //   for (float y = Y_MIN; y < Y_MAX; y += DY) {
-  //     float total_error = 0.0f;
+  float best_error = INFINITY;
+  float best_x = 0.0f;
+  float best_y = 0.0f;
+  for (float x = X_MIN; x < X_MAX; x += DX) {
+    for (float y = Y_MIN; y < Y_MAX; y += DY) {
+      float total_error = 0.0f;
 
-  //     float dx_0 = x - mic_positions[0][0];
-  //     float dy_0 = y - mic_positions[0][1];
-  //     float dist_0 = sqrtf(dx_0 * dx_0 + dy_0 * dy_0);
+      float dx_0 = x - mic_positions[0][0];
+      float dy_0 = y - mic_positions[0][1];
+      float dist_0_sq = dx_0 * dx_0 + dy_0 * dy_0;
 
-  //     for (int i = 1; i < nproc; i++) {
-  //       float dx_i = x - mic_positions[i][0];
-  //       float dy_i = y - mic_positions[i][1];
-  //       float dist_i = sqrtf(dx_i * dx_i + dy_i * dy_i);
+      for (int i = 1; i < TOPOLOGY; i++) {
+        float dx_i = x - mic_positions[i][0];
+        float dy_i = y - mic_positions[i][1];
+        float dist_i_sq = dx_i * dx_i + dy_i * dy_i;
 
-  //       float error = dist_0 - dist_i - best_dist_diff[i];
-  //       total_error += error * error;
-  //     }
+        float error = dist_0_sq - dist_i_sq - best_dist_diff[i];
+        total_error += error * error;
+      }
 
-  //     if (total_error < best_error) {
-  //       best_error = total_error;
-  //       best_x = x;
-  //       best_y = y;
-  //     }
-  //   }
-  // }
+      if (total_error < best_error) {
+        best_error = total_error;
+        best_x = x;
+        best_y = y;
+      }
+    }
+  }
 
-  // if (rank == 1) {
-  //   if (silent) {
-  //     std::cout << "silent" << std::endl;
-  //   } else {
-  //     std::cout << "mic position: " << mic_positions[1][0] << ", " << mic_positions[1][1] << std::endl;
-  //     std::cout << "coord: " << best_x << ", " << best_y << std::endl;
-  //   }
-  //   // std::cout << "dx, dy: " << DX << ", " << DY << std::endl;
-  // }
+  if (rank == 1) {
+    if (silent) {
+      printf("silent\n");
+      // std::cout << "silent" << std::endl;
+    } else {
+      printf("coord: (%d, %d)\n", (int)(best_x * 100), (int)(best_y * 100));
+      // std::cout << "mic position: " << mic_positions[1][0] << ", " << mic_positions[1][1] << std::endl;
+      // std::cout << "coord: " << best_x << ", " << best_y << std::endl;
+    }
+    // std::cout << "dx, dy: " << DX << ", " << DY << std::endl;
+  }
 }
 
 
@@ -154,7 +177,9 @@ void computation() {
 
   sleep(5000);  
 
-  sounddetect_ref_pair();
+  for (int i = 0; i < 3840; i += 256) {
+    sounddetect_ref_pair(i);
+  }
   
   while (1);
 }

@@ -25,7 +25,7 @@ static volatile uint8_t syn_head = 0;
 static volatile uint8_t syn_tail = 0;
 
 /* General buffer for unexpected ACK/DATA packets */
-#define PKTBUF_SIZE 4
+#define PKTBUF_SIZE 16
 static int pktbuf_valid[PKTBUF_SIZE];
 static packet_t pktbuf[PKTBUF_SIZE];
 
@@ -66,7 +66,7 @@ static packet_t wait_for(rank_t src, uint8_t opcode, tag_t tag) {
     return pending.result;
 }
 
-#define DEBUG_MPI 1
+#define DEBUG_MPI 0
 
 #if DEBUG_MPI
 #define MPI_DEBUG(...) printf(__VA_ARGS__)
@@ -289,7 +289,7 @@ void tinimpi_recv2(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity, u
     }
 
     *out_len = 0;
-    uint8_t last_seq = expected_len / _NETWORK_MAX_PAYLOAD_SIZE;
+    uint8_t last_seq = (expected_len - 1) / _NETWORK_MAX_PAYLOAD_SIZE;
     while (1) {
         packet_t p = wait_for(src, DATA, 0);
         MPI_DEBUG("received data from %d, seq=%d len=%d\n", src, p.seq, p.len);

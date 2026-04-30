@@ -104,7 +104,8 @@ ifeq ($(FLOAT), soft)
 	U_LIB_FILES = $(U_LIB_DIR)/soft_float/libc.a $(SOFT_FLOAT_LIB)
 	FLOAT_ARCH  += -mfloat-abi=soft
 else
-	U_LIB_FILES = $(U_LIB_DIR)/hard_float/libc.a $(U_LIB_DIR)/hard_float/libm.a  $(SOFT_FLOAT_LIB)
+# 	U_LIB_FILES = $(U_LIB_DIR)/hard_float/libc.a $(U_LIB_DIR)/hard_float/libm.a  $(SOFT_FLOAT_LIB)
+	U_LIB_FILES = $(U_LIB_DIR)/hard_float/libc.a $(U_LIB_DIR)/hard_float/libm.a  $(U_LIB_DIR)/hard_float/libgcc.a $(U_LIB_DIR)/hard_float/libg.a
 	FLOAT_ARCH  += -mfloat-abi=hard -mfpu=fpv4-sp-d16  -march=armv7e-m
 endif
 
@@ -118,7 +119,7 @@ else
 endif
 
 ARCH                 = $(ARG) $(FLOAT_ARCH) -mslow-flash-data -mcpu=cortex-m4 -mlittle-endian -mthumb -ffreestanding
-COMPILER_ERROR_FLAGS = -std=gnu99 -Wall -Werror -Wshadow -Wextra -Wunused -Wno-unused-variable
+COMPILER_ERROR_FLAGS = -std=gnu99 -Wall -Werror -Wshadow -Wextra -Wunused -Wno-unused-variable -u _printf_float
 C_LIB_FLAG           = -nostdlib
 CCFLAGS              += $(ARCH) $(COMPILER_ERROR_FLAGS) $(C_LIB_FLAG) $(OPTIMIZATION) $(DEFINE_MACROS)
 K_CCFLAGS            = $(CCFLAGS) -nostartfiles
