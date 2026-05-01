@@ -59,19 +59,19 @@ struct spi_reg_map {
 /* ── DMA register map ────────────────────────────────────────────────────── */
 
 struct dma_reg_map {
-    volatile uint32_t LISR;   /* 0x00 low interrupt status  */
-    volatile uint32_t HISR;   /* 0x04 high interrupt status */
-    volatile uint32_t LIFCR;  /* 0x08 low interrupt flag clear  */
-    volatile uint32_t HIFCR;  /* 0x0C high interrupt flag clear */
+    volatile uint32_t LISR;   // 0x00 low interrupt status
+    volatile uint32_t HISR;   // 0x04 high interrupt status
+    volatile uint32_t LIFCR;  // 0x08 low interrupt flag clear
+    volatile uint32_t HIFCR;  // 0x0C high interrupt flag clear
 };
 
 struct dma_stream_reg_map {
-    volatile uint32_t CR;    /* 0x00 */
-    volatile uint32_t NDTR;  /* 0x04 */
-    volatile uint32_t PAR;   /* 0x08 */
-    volatile uint32_t M0AR;  /* 0x0C */
-    volatile uint32_t M1AR;  /* 0x10 */
-    volatile uint32_t FCR;   /* 0x14 */
+    volatile uint32_t CR;    // 0x00 
+    volatile uint32_t NDTR;  // 0x04
+    volatile uint32_t PAR;   // 0x08
+    volatile uint32_t M0AR;  // 0x0C
+    volatile uint32_t M1AR;  // 0x10
+    volatile uint32_t FCR;   // 0x14
 };
 
 #define DMA1_BASE    ((struct dma_reg_map *)    0x40026000)
@@ -171,21 +171,21 @@ void sys_spi_init(uint8_t link_id) {
         /* clear stale flags */
         DMA1_BASE->LIFCR = DMA_LIFCR_CTCIF3;
 
-        s->PAR   = (uint32_t)&spi->DR;       /* source: SPI2 data register  */
-        s->M0AR  = (uint32_t)dma_buf[0];     /* destination buffer 0        */
-        s->M1AR  = (uint32_t)dma_buf[1];     /* destination buffer 1        */
+        s->PAR   = (uint32_t)&spi->DR;
+        s->M0AR  = (uint32_t)dma_buf[0];
+        s->M1AR  = (uint32_t)dma_buf[1];
         s->NDTR  = SPI_PACKET_SIZE;
-        s->FCR   = 0;                         /* direct mode (no FIFO)       */
+        s->FCR   = 0;
 
-        s->CR = DMA_CR_CHSEL0    /* channel 0 = SPI2_RX */
-              | DMA_CR_DBM       /* double-buffer, runs forever */
+        s->CR = DMA_CR_CHSEL0
+              | DMA_CR_DBM
               | DMA_CR_PL_HIGH
               | DMA_CR_MSIZE_BYTE
               | DMA_CR_PSIZE_BYTE
-              | DMA_CR_MINC      /* increment memory pointer */
-              | DMA_CR_CIRC      /* required for DBM */
+              | DMA_CR_MINC      // increment memory pointer
+              | DMA_CR_CIRC      // required for Double Buffer mode
               | DMA_CR_DIR_P2M
-              | DMA_CR_TCIE;     /* interrupt on each completed buffer */
+              | DMA_CR_TCIE;     // interrupt on each completed buffer
 
         nvic_irq(DMA1_STREAM3_IRQ, IRQ_ENABLE);
 
@@ -223,15 +223,15 @@ void sys_spi_init(uint8_t link_id) {
 
         DMA1_BASE->HIFCR = DMA_HIFCR_CTCIF5;
 
-        s->PAR  = (uint32_t)&spi->DR;  /* destination: SPI3 data register */
-        s->FCR  = 0;                   /* direct mode */
+        s->PAR  = (uint32_t)&spi->DR;
+        s->FCR  = 0;
 
         s->CR = DMA_CR_CHSEL0
               | DMA_CR_PL_HIGH
               | DMA_CR_MSIZE_BYTE
               | DMA_CR_PSIZE_BYTE
               | DMA_CR_MINC
-              | DMA_CR_DIR_M2P;        /* memory → peripheral, single shot */
+              | DMA_CR_DIR_M2P;
     }
 }
 
@@ -246,9 +246,6 @@ void dma1_stream3_irq_handler(void) {
 
   dma->LIFCR = DMA_LIFCR_CTCIF3;
 
-  /* CT has already toggled to the next target:
-      CT=1 means DMA is now filling M1 → M0 (buf[0]) just completed
-      CT=0 means DMA is now filling M0 → M1 (buf[1]) just completed */
   uint8_t completed = ((s->CR & DMA_CR_CT) != 0) ? 0 : 1;
 
   uint8_t next = (pkt_head + 1) % SPI_PKT_QUEUE_DEPTH;
@@ -257,7 +254,6 @@ void dma1_stream3_irq_handler(void) {
       pkt_queue[pkt_head][i] = dma_buf[completed][i];
     pkt_head = next;
   }
-  /* if queue is full the packet is silently dropped */
 
   nvic_clear_pending(DMA1_STREAM3_IRQ);
 }
@@ -285,8 +281,8 @@ int sys_spi_rx_dequeue(uint8_t *buf, uint32_t len) {
     return 0;
 }
 
-/* Blocking receive — spins until a packet arrives then dequeues it.
-   Kept for backwards compatibility with existing get_packet() callers. */
+// Blocking receive — spins until a packet arrives then dequeues it.
+// Kept for backwards compatibility with existing get_packet() callers.
 void sys_spi_receive(uint8_t *rx_data, uint32_t len) {
     while (!sys_spi_rx_ready());
     sys_spi_rx_dequeue(rx_data, len);
