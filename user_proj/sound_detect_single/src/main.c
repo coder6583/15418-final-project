@@ -50,58 +50,22 @@ rank_t get_prev_rank() {
 }
 
 void sounddetect_ref_pair(
-  int offset,
-  uint32_t *total_communication_time,
-  uint32_t *total_computation_time
+  int offset
   // int num_samples,
   // int sample_freq,
   // int nproc
 ) {
   // (void)num_samples, sample_freq;
-  uint32_t comp_start = get_time();
   int16_t all_mic_data[4][NUM_SAMPLES];
 
   for (int i = 0; i < 4; i++) {
     for (int j = 0; j < NUM_SAMPLES; j++) {
-      all_mic_data[i][j] = 0;
+      all_mic_data[i][j] = (int16_t)(raw_data[j + offset][i] >> 8);
     }
   }
-
-  // Simplifying from 24 bits to 16 bits
-  all_mic_data[rank][0] = rank;
-  for (int i = 1; i < NUM_SAMPLES + 1; i++) {
-    all_mic_data[rank][i] = (int16_t)(raw_data[i + offset][rank] >> 8);
-  }
-  *total_computation_time += (get_time() - comp_start);
-
-  uint32_t comm_start = get_time();
-  int next_rank = get_next_rank();
-  int prev_rank = get_prev_rank();
-  // Send data to all nodes
-  // initiate sending data
-  tinimpi_send2(next_rank, 0, (uint8_t*)all_mic_data[rank], NUM_SAMPLES * sizeof(int16_t));
-  int done = 0;
-  while (!done) {
-    int16_t recv_buffer[NUM_SAMPLES];
-    uint16_t out_len;
-    tinimpi_recv2(prev_rank, 0, (uint8_t*)recv_buffer, NUM_SAMPLES * sizeof(int16_t), &out_len);
-
-    int orig_src = recv_buffer[0];
-    if (orig_src == rank) {
-      done = 1;
-    } else {
-      memcpy(all_mic_data[orig_src], recv_buffer,
-              NUM_SAMPLES * sizeof(int16_t));
-      tinimpi_send2(next_rank, 0, (uint8_t *)recv_buffer, NUM_SAMPLES * sizeof(int16_t));
-      done = 0;
-    }
-  }
-  tinimpi_barrier2();
-  *total_communication_time += (get_time() - comm_start);
 
   // // Find Time Lag
   // std::vector<float> best_dist_diff(nproc, 0.0f);
-  comp_start = get_time();
   float best_dist_diff[2];
   int silent = 1;
   uint16_t send_size = NUM_SAMPLES + 1;
@@ -146,13 +110,8 @@ void sounddetect_ref_pair(
   float best_error = INFINITY;
   float best_x = 0.0f;
   float best_y = 0.0f;
-  
-  int nx = GRID_WIDTH / TOPOLOGY;
-  int start_ix = rank * nx;
-  int end_ix = (rank + 1) * nx;
 
-  for (int ix = start_ix; ix < end_ix; ix ++) {
-    float x = X_MIN + ix * DX;
+  for (float x = X_MIN; x < X_MAX; x += DX) {
     for (float y = Y_MIN; y < Y_MAX; y += DY) {
       float total_error = 0.0f;
 
@@ -176,50 +135,6 @@ void sounddetect_ref_pair(
       }
     }
   }
-  *total_computation_time += (get_time() - comp_start);
-
-  comm_start = get_time();
-  struct Result local_result = {
-    best_error,
-    best_x,
-    best_y,
-    rank,
-  };
-
-  struct Result all_results[2];
-
-  tinimpi_send2(next_rank, 0, (uint8_t*)&local_result, sizeof(struct Result));
-  all_results[rank] = local_result;
-  int gather_done = 0;
-  while(!gather_done) {
-    struct Result recv_buffer;
-    uint16_t out_len = 0;
-    tinimpi_recv2(prev_rank, 0, (uint8_t*)&recv_buffer, sizeof(struct Result), &out_len);
-
-    int orig_src = recv_buffer.src;
-    if (orig_src == rank) {
-      gather_done = 1;
-    } else {
-      memcpy(&all_results[orig_src], &recv_buffer, sizeof(struct Result));
-      tinimpi_send2(next_rank, 0, (uint8_t*)&recv_buffer, sizeof(struct Result));
-      gather_done = 0;
-    }
-  }
-  tinimpi_barrier2();
-  *total_communication_time += (get_time() - comm_start);
-
-  comp_start = get_time();
-  float global_best_error = INFINITY;
-  float global_x = 0.0f;
-  float global_y = 0.0f;
-  for (int i = 0; i < TOPOLOGY; i++) {
-    if (all_results[i].error < global_best_error) {
-      global_best_error = all_results[i].error;
-      global_x = all_results[i].x;
-      global_y = all_results[i].y;
-    }
-  }
-  *total_computation_time += (get_time() - comp_start);
 
   if (rank == 1) {
     if (silent) {
@@ -227,7 +142,7 @@ void sounddetect_ref_pair(
       // std::cout << "silent" << std::endl;
     } else {
       // printf("coord: (%d, %d)\n", (int)(best_x * 100), (int)(best_y * 100));
-      printf("coord: (%d, %d)\n", (int)(global_x * 100), (int)(global_y * 100));
+      printf("coord: (%d, %d)\n", (int)(best_x * 100), (int)(best_y * 100));
       // std::cout << "mic position: " << mic_positions[1][0] << ", " << mic_positions[1][1] << std::endl;
       // std::cout << "coord: " << best_x << ", " << best_y << std::endl;
     }
@@ -239,23 +154,23 @@ void sounddetect_ref_pair(
 void computation() {
   tag_t t = 16;
 
-  sleep(5000);  
+  // sleep(5000);  
 
-  uint32_t comp_time = 0;
-  uint32_t comm_time = 0;
   uint32_t start_time = get_time();
+  printf("start computation...\n");
   for (int i = 0; i < 3840; i += 256) {
-    sounddetect_ref_pair(i, &comm_time, &comp_time);
+    printf("starting iteration %d...\n", i);
+    sounddetect_ref_pair(i);
   }
-  uint32_t total_time = get_time() - start_time;
-  printf("total time: %ldms\n", total_time);
-  printf("compute time: %ldms\n", comp_time);
-  printf("communication time: %ldms\n", comm_time);
+  uint32_t compute_time = get_time() - start_time;
+  printf("compute time: %ldms\n", compute_time);
   
   while (1);
 }
 
 int main(UNUSED int argc, UNUSED char const *argv[]) {
-  tinimpi_init(&rank, &computation);
+  thread_init(1, 256, NULL, 0);
+  thread_create(&computation, 0, 1, 1, NULL);
+  scheduler_start(1000); // just the default thread;
   while(1);
 }
