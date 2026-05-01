@@ -70,7 +70,7 @@ packet_t get_packet() {
 }
 
 int handle_packet(packet_t *out_p) {
-  if (spi_rx_ready()) {
+  while (spi_rx_ready()) {
     uint8_t buf[72];
     spi_rx_dequeue(buf, 71);
     packet_t p = build_packet(buf);
