@@ -326,3 +326,89 @@ void tinimpi_barrier2() {
     }
     MPI_DEBUG("exiting barrier\n");
 }
+
+/* ── non-blocking send/recv ──────────────────────────────────────────────── */
+
+/* Post a non-blocking send. Fires the SYN immediately and returns; the ACK
+   wait and data transmission happen inside tinimpi_wait(). */
+void tinimpi_isend(rank_t dest, tag_t tag, uint8_t *buf, uint16_t len,
+                   tinimpi_req_t *req) {
+    req->state = TREQ_SEND_WAIT_ACK;
+    req->peer  = dest;
+    req->tag   = tag;
+    req->buf   = buf;
+    req->len   = len;
+
+    uint8_t header_data[] = { tag, (len >> 8) & 0xFF, len & 0xFF };
+    MPI_DEBUG("isend: SYN to rank %d, tag=%d\n", dest, tag);
+    send_packet(dest, header_data, 3, SYN, 0);
+}
+
+/* Post a non-blocking receive. Consumes a buffered SYN immediately if one is
+   already in syn_queue; otherwise defers the SYN wait to tinimpi_wait(). */
+void tinimpi_irecv(rank_t src, tag_t tag, uint8_t *buf, uint16_t buf_capacity,
+                   uint16_t *out_len, tinimpi_req_t *req) {
+    req->peer    = src;
+    req->tag     = tag;
+    req->buf     = buf;
+    req->len     = buf_capacity;
+    req->out_len = out_len;
+    *out_len     = 0;
+
+    for (uint8_t i = syn_tail; i != syn_head; i = (i + 1) % SYN_QUEUE_SIZE) {
+        if (syn_queue[i].src == src && syn_queue[i].tag == tag) {
+            MPI_DEBUG("irecv: using buffered SYN from %d\n", src);
+            req->expected_len = syn_queue[i].expected_len;
+            if (i == syn_tail) {
+                syn_tail = (syn_tail + 1) % SYN_QUEUE_SIZE;
+            } else {
+                syn_queue[i] = syn_queue[syn_tail];
+                syn_tail = (syn_tail + 1) % SYN_QUEUE_SIZE;
+            }
+            req->state = TREQ_RECV_WAIT_DATA;
+            return;
+        }
+    }
+    MPI_DEBUG("irecv: no buffered SYN from %d, will wait\n", src);
+    req->state = TREQ_RECV_WAIT_SYN;
+}
+
+/* Block until the operation described by req is complete. */
+void tinimpi_wait(tinimpi_req_t *req) {
+    if (req->state == TREQ_DONE) return;
+
+    if (req->state == TREQ_SEND_WAIT_ACK) {
+        MPI_DEBUG("wait: waiting for ACK from %d\n", req->peer);
+        wait_for(req->peer, ACK, 0);
+        MPI_DEBUG("wait: sending data to %d\n", req->peer);
+        for (uint16_t offset = 0; offset < req->len; offset += _NETWORK_MAX_PAYLOAD_SIZE) {
+            uint16_t chunk = req->len - offset;
+            if (chunk > _NETWORK_MAX_PAYLOAD_SIZE) chunk = _NETWORK_MAX_PAYLOAD_SIZE;
+            send_packet(req->peer, req->buf + offset, chunk, DATA,
+                        offset / _NETWORK_MAX_PAYLOAD_SIZE);
+        }
+        req->state = TREQ_DONE;
+        return;
+    }
+
+    if (req->state == TREQ_RECV_WAIT_SYN) {
+        MPI_DEBUG("wait: waiting for SYN from %d\n", req->peer);
+        packet_t p = wait_for(req->peer, SYN, req->tag);
+        req->expected_len = ((uint16_t)p.payload[1] << 8) | p.payload[2];
+        MPI_DEBUG("wait: sending ACK to %d\n", req->peer);
+        send_packet(req->peer, NULL, 0, ACK, 0);
+        req->state = TREQ_RECV_WAIT_DATA;
+    }
+
+    /* TREQ_RECV_WAIT_DATA */
+    uint8_t last_seq = (req->expected_len - 1) / _NETWORK_MAX_PAYLOAD_SIZE;
+    while (1) {
+        packet_t p = wait_for(req->peer, DATA, 0);
+        MPI_DEBUG("wait: data from %d seq=%d len=%d\n", req->peer, p.seq, p.len);
+        memcpy(req->buf + (p.seq * _NETWORK_MAX_PAYLOAD_SIZE), p.payload, p.len);
+        *req->out_len += p.len;
+        if (p.seq == last_seq) break;
+    }
+    if (*req->out_len > req->len) *req->out_len = req->len;
+    req->state = TREQ_DONE;
+}
